@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local HarvestEvents = ReplicatedStorage:WaitForChild("HarvestEvents")
 local DragonStorageFull = HarvestEvents:WaitForChild("DragonStorageFull")
 
@@ -98,7 +99,9 @@ local function ensureUi()
 	makeAction("UpgradeButton", "Upgrade Storage", UDim2.fromOffset(16, 228), UDim2.new(0.46, 0, 0, 40), Theme.Colors.Gold, function()
 		closePopup()
 		if _G.DragonIslandOpenBuildings then
-			_G.DragonIslandOpenBuildings("Upgrade Dragon Storage capacity.")
+			-- Building id, not a hint string: openBuildingsPanel(buildingId) pre-selects
+			-- and highlights the matching building (see BuildingUpgradeClient.client.luau).
+			_G.DragonIslandOpenBuildings("DragonStorage")
 		end
 	end)
 
@@ -108,6 +111,8 @@ end
 _G.DragonIslandCloseStorageFull = function()
 	closePopup()
 end
+
+UIBridge.RegisterPanel("StorageFull", { Close = closePopup })
 
 local function openPopup(payload)
 	ensureUi()

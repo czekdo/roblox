@@ -4,6 +4,7 @@ local UserInputService = game:GetService("UserInputService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -350,6 +351,8 @@ end
 
 _G.DragonIslandOpenTrainingUI = openTrainingUI
 _G.DragonIslandCloseTrainingUI = closeTrainingUI
+
+UIBridge.RegisterPanel("DragonTraining", { Open = openTrainingUI, Close = closeTrainingUI })
 
 _G.DragonIslandOpenTrainingForDragon = function(dragonId, message)
 	openTrainingUI(message or "Choose a training program for your dragon.")

@@ -3,6 +3,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -266,6 +267,8 @@ end
 
 _G.DragonIslandOpenCrafting = openPanel
 _G.DragonIslandCloseCrafting = closeCraftPanel
+
+UIBridge.RegisterPanel("Workshop", { Open = openPanel, Close = closeCraftPanel })
 
 CraftStateUpdated.OnClientEvent:Connect(refreshState)
 

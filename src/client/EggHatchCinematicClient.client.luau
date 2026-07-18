@@ -5,6 +5,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local DragonEggConfig = require(ReplicatedStorage:WaitForChild("DragonEggConfig"))
 local EggOpeningSequence = require(ReplicatedStorage:WaitForChild("EggOpening"):WaitForChild("EggOpeningSequence"))
 local EggOpeningConfig = require(ReplicatedStorage:WaitForChild("EggOpening"):WaitForChild("EggOpeningConfig"))
@@ -173,23 +174,12 @@ end
 
 local cinematicGui, flashFrame, glowRing, revealCard, rewardIcon, petNameLabel, rarityLabel, eggLabel, dimFrame, skipHint, inputCatcher = createCinematicGui()
 
-local MODAL_CLOSERS = {
-	"DragonIslandCloseEggShop",
-	"DragonIslandCloseMergeUI",
-	"DragonIslandCloseRoster",
-	"DragonIslandCloseTrainingUI",
-	"DragonIslandCloseCrafting",
-	"DragonIslandCloseBuildings",
-	"DragonIslandCloseDailyQuests",
-}
-
 local function closeOpenModals()
-	for _, closerName in MODAL_CLOSERS do
-		local closer = _G[closerName]
-		if typeof(closer) == "function" then
-			pcall(closer)
-		end
-	end
+	-- Closes every panel registered with UIBridge, not just a hand-maintained subset —
+	-- previously this list (EggShop/MergeUI/Roster/TrainingUI/Crafting/Buildings/DailyQuests
+	-- only) silently missed Achievements/Rebirth/Personalization/WorldPortal/StorageFull/
+	-- SkillTree/Milestones, so those stayed open through the hatch cinematic.
+	UIBridge.CloseAllPanels()
 	Theme.cleanupAllModalOverlays(playerGui)
 end
 

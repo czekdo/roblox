@@ -6,6 +6,7 @@ local TweenService = game:GetService("TweenService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 local camera = workspace.CurrentCamera
@@ -1349,6 +1350,9 @@ _G.DragonIslandOpenEggShop = openEggShop
 _G.DragonIslandCloseEggShop = closeEggShop
 _G.DragonIslandOpenMergeUI = openMergeUI
 _G.DragonIslandCloseMergeUI = closeMergeUI
+
+UIBridge.RegisterPanel("EggShop", { Open = openEggShop, Close = closeEggShop })
+UIBridge.RegisterPanel("DragonMerge", { Open = openMergeUI, Close = closeMergeUI })
 
 createEggShopUI()
 createMergeUI()

@@ -72,20 +72,24 @@ navLayout.Padding = UDim.new(0, FLOAT_BTN_GAP)
 navLayout.SortOrder = Enum.SortOrder.LayoutOrder
 navLayout.Parent = nav
 
+-- Keys here double as UIBridge panel ids (openPanel/closePanel below resolve the panel's
+-- own Open/Close through UIBridge.RegisterPanel by this same key, so there is one place —
+-- the owning script's RegisterPanel call — that says what a panel's opener/closer are,
+-- not a second copy of opener/closer name strings here.
 local windows = {
-	EggShop = { label = "Egg Shop", gui = "EggShopUI", panel = "EggShopPanel", dim = "DimBackground", opener = "DragonIslandOpenEggShop", closer = "DragonIslandCloseEggShop", icon = Theme.Icons.Egg },
-	Dragons = { label = "Dragons", gui = "DragonRosterUI", panel = "DragonRosterPanel", dim = "DimBackground", opener = "DragonIslandOpenRoster", closer = "DragonIslandCloseRoster", icon = Theme.Icons.Dragon },
-	DragonMerge = { label = "Merge", gui = "DragonMergeUI", panel = "DragonMergePanel", dim = "DimBackground", opener = "DragonIslandOpenMergeUI", closer = "DragonIslandCloseMergeUI", icon = Theme.Icons.Merge },
-	DragonTraining = { label = "Academy", gui = "DragonTrainingUI", panel = "DragonTrainingPanel", dim = "DimBackground", opener = "DragonIslandOpenTrainingUI", closer = "DragonIslandCloseTrainingUI", icon = Theme.Icons.Book },
-	Workshop = { label = "Workshop", gui = "WorkshopCraftUI", panel = "CraftPanel", dim = "DimBackground", opener = "DragonIslandOpenCrafting", closer = "DragonIslandCloseCrafting", icon = Theme.Icons.Hammer, enabledKey = true },
-	Buildings = { label = "Buildings", gui = "BuildingUpgradeUI", panel = "BuildingPanel", dim = "DimBackground", opener = "DragonIslandOpenBuildings", closer = "DragonIslandCloseBuildings", icon = Theme.Icons.House },
-	DailyQuests = { label = "Quests", gui = "DailyQuestUI", panel = "QuestPanel", dim = "DimBackground", opener = "DragonIslandOpenDailyQuests", closer = "DragonIslandCloseDailyQuests", icon = Theme.Icons.Scroll },
-	Achievements = { label = "Achievements", gui = "AchievementUI", panel = "AchievementPanel", dim = "DimBackground", opener = "DragonIslandOpenAchievements", closer = "DragonIslandCloseAchievements", icon = Theme.Icons.Trophy },
-	Rebirth = { label = "Ascension", gui = "RebirthUI", panel = "RebirthPanel", dim = "DimBackground", opener = "DragonIslandOpenRebirth", closer = "DragonIslandCloseRebirth", icon = Theme.Icons.Rebirth },
+	EggShop = { label = "Egg Shop", gui = "EggShopUI", panel = "EggShopPanel", dim = "DimBackground", icon = Theme.Icons.Egg },
+	Dragons = { label = "Dragons", gui = "DragonRosterUI", panel = "DragonRosterPanel", dim = "DimBackground", icon = Theme.Icons.Dragon },
+	DragonMerge = { label = "Merge", gui = "DragonMergeUI", panel = "DragonMergePanel", dim = "DimBackground", icon = Theme.Icons.Merge },
+	DragonTraining = { label = "Academy", gui = "DragonTrainingUI", panel = "DragonTrainingPanel", dim = "DimBackground", icon = Theme.Icons.Book },
+	Workshop = { label = "Workshop", gui = "WorkshopCraftUI", panel = "CraftPanel", dim = "DimBackground", icon = Theme.Icons.Hammer, enabledKey = true },
+	Buildings = { label = "Buildings", gui = "BuildingUpgradeUI", panel = "BuildingPanel", dim = "DimBackground", icon = Theme.Icons.House },
+	DailyQuests = { label = "Quests", gui = "DailyQuestUI", panel = "QuestPanel", dim = "DimBackground", icon = Theme.Icons.Scroll },
+	Achievements = { label = "Achievements", gui = "AchievementUI", panel = "AchievementPanel", dim = "DimBackground", icon = Theme.Icons.Trophy },
+	Rebirth = { label = "Ascension", gui = "RebirthUI", panel = "RebirthPanel", dim = "DimBackground", icon = Theme.Icons.Rebirth },
 	-- Not part of navOrder (no nav button): opened only by its own popup event, but registered
 	-- here so Escape's closeTopWindow can find and close it instead of falling through to the
 	-- releaseAllInput fallback, which never actually hides the panel.
-	StorageFull = { label = "Storage Full", gui = "DragonStorageFullUI", panel = "StorageFullPanel", dim = "DimBackground", closer = "DragonIslandCloseStorageFull" },
+	StorageFull = { label = "Storage Full", gui = "DragonStorageFullUI", panel = "StorageFullPanel", dim = "DimBackground" },
 }
 
 local navButtons = {}
@@ -156,26 +160,27 @@ local function pushWindow(key)
 	table.insert(windowStack, key)
 end
 
-local function closePanel(info)
-	if info.closer and _G[info.closer] then
-		_G[info.closer]()
+local function closePanel(key, info)
+	if UIBridge.ClosePanel(key) then
 		return
 	end
+	-- Fallback for a panel that somehow isn't registered yet (e.g. load-order edge case):
+	-- manipulate its GUI directly instead of doing nothing.
 	local gui, panel = getPanel(info)
 	if not gui then
 		return
 	end
 	local dim = info.dim and gui:FindFirstChild(info.dim, true)
 	Theme.closeModalWindow(gui, panel, dim, function()
-		if _G.DragonIslandNotifyModalClosed then
-			_G.DragonIslandNotifyModalClosed(gui.Name)
-		end
+		UIBridge.NotifyModalClosed(gui.Name)
 	end)
 end
 
-local function openPanel(info)
-	if info.opener and _G[info.opener] then
-		_G[info.opener]("Opened from navigation.")
+local function openPanel(key, info)
+	-- No filler message: openEggShop/openTrainingUI/openMergeUI/openRoster already fall back
+	-- to their own more useful default hint (or capacity subtitle, for Roster) when message is
+	-- nil. Passing a generic "Opened from navigation." string here would overwrite that.
+	if UIBridge.OpenPanel(key) then
 		return
 	end
 	local gui, panel = getPanel(info)
@@ -195,7 +200,7 @@ end
 local function setWindow(key, visible)
 	local info = windows[key]
 	if not info then return end
-	if visible then openPanel(info) pushWindow(key) else closePanel(info) end
+	if visible then openPanel(key, info) pushWindow(key) else closePanel(key, info) end
 	task.defer(setNavHighlights)
 end
 

@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local RebirthConfig = require(ReplicatedStorage:WaitForChild("RebirthConfig"))
 
 local RebirthEvents = ReplicatedStorage:WaitForChild("RebirthEvents")
@@ -100,6 +101,45 @@ local BRANCH_ICONS = {
 	Explorer = Theme.Icons.House,
 }
 
+-- Defined here (not further down near its sibling scroll helpers) because
+-- refreshMilestoneUI/refreshPreviewUI below can run before the rest of this file's
+-- top-to-bottom initialization finishes, if RebirthStateUpdated fires from the server
+-- early enough — a local function declared later would still be nil at that point.
+local function clearScrollChildren(scroll)
+	if not scroll then return end
+	for _, child in scroll:GetChildren() do
+		if child:IsA("GuiObject") and child.Name ~= "UIListLayout" and child.Name ~= "EmptyState" and not child:IsA("UIPadding") then
+			child:Destroy()
+		end
+	end
+end
+
+local function setScrollEmptyState(scroll, emptyState, show, title, body, icon)
+	if not scroll then
+		return
+	end
+	if emptyState then
+		emptyState.Visible = show == true
+		if show then
+			local titleLabel = emptyState:FindFirstChild("EmptyTitle")
+			local bodyLabel = emptyState:FindFirstChild("EmptyBody")
+			if titleLabel then
+				titleLabel.Text = title or "Nothing here yet"
+			end
+			if bodyLabel then
+				bodyLabel.Text = body or ""
+			end
+			local iconFrame = emptyState:FindFirstChild("IconFrame")
+			if iconFrame then
+				local img = iconFrame:FindFirstChildOfClass("ImageLabel")
+				if img and icon then
+					img.Image = icon
+				end
+			end
+		end
+	end
+end
+
 local function formatMilestoneRewardType(rewardType)
 	if rewardType == "Title" then
 		return "Title"
@@ -111,6 +151,20 @@ local function formatMilestoneRewardType(rewardType)
 		return "Cosmetic"
 	end
 	return tostring(rewardType or "Reward")
+end
+
+local function getMilestoneStatus(milestone, rebirthCount)
+	local requiredCount = math.max(1, math.floor(tonumber(milestone.rebirthCount) or 0))
+	if milestone.claimed == true then
+		return "Claimed", Theme.Colors.GoldBright
+	end
+	if milestone.unlocked == true then
+		return "Unlocked", Theme.Colors.Success
+	end
+	if rebirthCount >= requiredCount then
+		return "Unlocked", Theme.Colors.Crystal
+	end
+	return "Locked", Theme.Colors.TextMuted
 end
 
 local function refreshMilestoneUI()
@@ -260,46 +314,6 @@ local function formatEffectBonus(node, rank)
 	return string.format("+%.0f%%", total * 100)
 end
 
-local function getMilestoneStatus(milestone, rebirthCount)
-	local requiredCount = math.max(1, math.floor(tonumber(milestone.rebirthCount) or 0))
-	if milestone.claimed == true then
-		return "Claimed", Theme.Colors.GoldBright
-	end
-	if milestone.unlocked == true then
-		return "Unlocked", Theme.Colors.Success
-	end
-	if rebirthCount >= requiredCount then
-		return "Unlocked", Theme.Colors.Crystal
-	end
-	return "Locked", Theme.Colors.TextMuted
-end
-
-local function setScrollEmptyState(scroll, emptyState, show, title, body, icon)
-	if not scroll then
-		return
-	end
-	if emptyState then
-		emptyState.Visible = show == true
-		if show then
-			local titleLabel = emptyState:FindFirstChild("EmptyTitle")
-			local bodyLabel = emptyState:FindFirstChild("EmptyBody")
-			if titleLabel then
-				titleLabel.Text = title or "Nothing here yet"
-			end
-			if bodyLabel then
-				bodyLabel.Text = body or ""
-			end
-			local iconFrame = emptyState:FindFirstChild("IconFrame")
-			if iconFrame then
-				local img = iconFrame:FindFirstChildOfClass("ImageLabel")
-				if img and icon then
-					img.Image = icon
-				end
-			end
-		end
-	end
-end
-
 local function populateSummaryList(scroll, items, emptyTitle, emptyBody)
 	if not scroll then
 		return
@@ -362,15 +376,6 @@ local function setShardDisplays()
 	end
 	if skillTreeShardLabel then
 		skillTreeShardLabel.Text = formatCompact(balance) .. " " .. (RebirthConfig.Currency.Symbol or "✦")
-	end
-end
-
-local function clearScrollChildren(scroll)
-	if not scroll then return end
-	for _, child in scroll:GetChildren() do
-		if child:IsA("GuiObject") and child.Name ~= "UIListLayout" and child.Name ~= "EmptyState" and not child:IsA("UIPadding") then
-			child:Destroy()
-		end
 	end
 end
 
@@ -1409,3 +1414,7 @@ _G.DragonIslandOpenSkillTree = openSkillTreePanel
 _G.DragonIslandCloseSkillTree = closeSkillTreePanel
 _G.DragonIslandOpenMilestones = openMilestonePanel
 _G.DragonIslandCloseMilestones = closeMilestonePanel
+
+UIBridge.RegisterPanel("Rebirth", { Open = openRebirthPanel, Close = closeRebirthPanel })
+UIBridge.RegisterPanel("SkillTree", { Open = openSkillTreePanel, Close = closeSkillTreePanel })
+UIBridge.RegisterPanel("Milestones", { Open = openMilestonePanel, Close = closeMilestonePanel })

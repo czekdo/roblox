@@ -107,4 +107,54 @@ function UIBridge.ResetModalRegistry()
 	broadcastModalLockChanged()
 end
 
+-- ============================================================
+-- Panel registry — one owner per panel id. Replaces the old
+-- pattern of every caller looking up _G.DragonIslandOpenX /
+-- _G.DragonIslandCloseX (or, worse, _G[stringVariable]) by name.
+-- ============================================================
+
+local panels = {}
+
+function UIBridge.RegisterPanel(id, handlers)
+	if typeof(id) ~= "string" or id == "" or typeof(handlers) ~= "table" then
+		return
+	end
+	panels[id] = handlers
+end
+
+function UIBridge.IsPanelRegistered(id)
+	return panels[id] ~= nil
+end
+
+function UIBridge.OpenPanel(id, ...)
+	local handlers = panels[id]
+	if not handlers or typeof(handlers.Open) ~= "function" then
+		return false
+	end
+	handlers.Open(...)
+	return true
+end
+
+function UIBridge.ClosePanel(id)
+	local handlers = panels[id]
+	if not handlers or typeof(handlers.Close) ~= "function" then
+		return false
+	end
+	handlers.Close()
+	return true
+end
+
+-- Closes every registered panel that has a Close handler. A panel with a
+-- broken closer does not stop the rest from closing.
+function UIBridge.CloseAllPanels()
+	for _, handlers in panels do
+		if typeof(handlers.Close) == "function" then
+			local ok, err = pcall(handlers.Close)
+			if not ok then
+				warn("[UIBridge] CloseAllPanels: a panel closer errored:", err)
+			end
+		end
+	end
+end
+
 return UIBridge

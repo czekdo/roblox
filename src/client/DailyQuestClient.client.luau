@@ -3,6 +3,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local player = Players.LocalPlayer
 local QuestEvents = ReplicatedStorage:WaitForChild("QuestEvents")
 local QuestUpdate = QuestEvents:WaitForChild("QuestUpdate")
@@ -94,13 +95,18 @@ local function createQuestUI()
 	questList.Name = "QuestList"
 end
 
-_G.DragonIslandOpenQuests = function()
+local function openQuests()
 	setQuestVisible(true)
 end
-_G.DragonIslandOpenDailyQuests = _G.DragonIslandOpenQuests
-_G.DragonIslandCloseDailyQuests = function()
+local function closeQuests()
 	setQuestVisible(false)
 end
+
+_G.DragonIslandOpenQuests = openQuests
+_G.DragonIslandOpenDailyQuests = openQuests
+_G.DragonIslandCloseDailyQuests = closeQuests
+
+UIBridge.RegisterPanel("DailyQuests", { Open = openQuests, Close = closeQuests })
 
 local function createQuestCard(quest, order)
 	local card = Theme.createFrame({

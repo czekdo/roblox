@@ -5,6 +5,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local IslandUnlockConfig = require(ReplicatedStorage:WaitForChild("IslandUnlockConfig"))
 local IslandEvents = ReplicatedStorage:WaitForChild("IslandEvents")
 local IslandUnlockState = IslandEvents:WaitForChild("IslandUnlockState")
@@ -649,5 +650,7 @@ updateEssenceLabel()
 
 _G.DragonIslandOpenWorldPortal = openPortal
 _G.DragonIslandCloseWorldPortal = closePortal
+
+UIBridge.RegisterPanel("WorldPortal", { Open = openPortal, Close = closePortal })
 
 print("[WorldPortalClient] World portal map ready")

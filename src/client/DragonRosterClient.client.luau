@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local HarvestConfig = require(ReplicatedStorage:WaitForChild("HarvestConfig"))
 local DragonAbilityConfig = require(ReplicatedStorage:WaitForChild("DragonAbilityConfig"))
 local DragonEggConfig = require(ReplicatedStorage:WaitForChild("DragonEggConfig"))
@@ -62,7 +63,7 @@ local sidebarItems = {
 	{ id = "Dragons", label = "Dragons", icon = Theme.Icons.Dragon },
 	{ id = "Codex", label = "Codex", icon = Theme.Icons.Book },
 	{ id = "Inventory", label = "Inventory", icon = Theme.Icons.Backpack },
-	{ id = "Kingdom", label = "Kingdom", icon = Theme.Icons.Crown, action = "DragonIslandOpenPersonalization" },
+	{ id = "Kingdom", label = "Kingdom", icon = Theme.Icons.Crown, panelId = "Personalization" },
 	{ id = "Leaderboards", label = "Leaderboards", icon = Theme.Icons.Trophy },
 }
 
@@ -1193,8 +1194,7 @@ local function buildUi()
 			item.label,
 			index,
 			function()
-				if item.action and _G[item.action] then
-					_G[item.action]()
+				if item.panelId and UIBridge.OpenPanel(item.panelId) then
 					return
 				end
 				setSidebarActive(item.id)
@@ -1219,7 +1219,7 @@ local function buildUi()
 	end
 end
 
-local function openRoster(_message)
+local function openRoster(message)
 	if not rosterGui then
 		buildUi()
 	end
@@ -1237,10 +1237,20 @@ local function openRoster(_message)
 	if not refreshRoster() then
 		refreshRosterWithRetry()
 	end
+	-- Callers like DragonStorageFullClient pass a contextual hint (e.g. "Manage your
+	-- dragon storage.") the same way openEggShop/openTrainingUI do; show it once as the
+	-- header subtitle. If refreshRosterWithRetry() is still pending, its own renderDragonsTab
+	-- call will overwrite this with the capacity subtitle once roster data loads — acceptable
+	-- since this is a one-off hint, not persistent state.
+	if typeof(message) == "string" and message ~= "" and headerSubtitle then
+		headerSubtitle.Text = message
+	end
 end
 
 _G.DragonIslandOpenRoster = openRoster
 _G.DragonIslandCloseRoster = closeRoster
+
+UIBridge.RegisterPanel("Dragons", { Open = openRoster, Close = closeRoster })
 
 HarvestUIUpdate.OnClientEvent:Connect(function(_essence, _dragonCount, _activeWorkers, maxDragons, storageCount, storageMax)
 	if typeof(maxDragons) == "number" then

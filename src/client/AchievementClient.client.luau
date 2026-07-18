@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local AchievementConfig = require(ReplicatedStorage:WaitForChild("AchievementConfig"))
 local AchievementEvents = ReplicatedStorage:WaitForChild("AchievementEvents")
 local AchievementUpdate = AchievementEvents:WaitForChild("AchievementUpdate")
@@ -269,7 +270,7 @@ local function showAchievementToast(payload)
 	end
 end
 
-_G.DragonIslandOpenAchievements = function()
+local function openAchievements()
 	if not screenGui then
 		buildUi()
 	end
@@ -277,9 +278,14 @@ _G.DragonIslandOpenAchievements = function()
 	setVisible(true)
 end
 
-_G.DragonIslandCloseAchievements = function()
+local function closeAchievements()
 	setVisible(false)
 end
+
+_G.DragonIslandOpenAchievements = openAchievements
+_G.DragonIslandCloseAchievements = closeAchievements
+
+UIBridge.RegisterPanel("Achievements", { Open = openAchievements, Close = closeAchievements })
 
 AchievementUpdate.OnClientEvent:Connect(function(payload)
 	latestPayload = payload

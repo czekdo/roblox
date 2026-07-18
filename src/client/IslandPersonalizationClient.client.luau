@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -178,5 +179,7 @@ end
 
 _G.DragonIslandOpenPersonalization = openPanel
 _G.DragonIslandClosePersonalization = closePersonalizationPanel
+
+UIBridge.RegisterPanel("Personalization", { Open = openPanel, Close = closePersonalizationPanel })
 
 KingdomStateUpdated.OnClientEvent:Connect(refreshState)

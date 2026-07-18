@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local mouse = player:GetMouse()
@@ -391,7 +392,7 @@ player.CharacterAdded:Connect(function()
 	end)
 end)
 
-_G.DragonIslandOpenBuildings = function(buildingId)
+local function openBuildingsPanel(buildingId)
 	local dim = screenGui and screenGui:FindFirstChild("DimBackground")
 	local opening = panel and not panel.Visible
 	screenGui.Enabled = true
@@ -416,4 +417,7 @@ _G.DragonIslandOpenBuildings = function(buildingId)
 	updateSelectedBuilding()
 end
 
+_G.DragonIslandOpenBuildings = openBuildingsPanel
 _G.DragonIslandCloseBuildings = closeBuildingsPanel
+
+UIBridge.RegisterPanel("Buildings", { Open = openBuildingsPanel, Close = closeBuildingsPanel })
