@@ -9,6 +9,7 @@ local DragonAbilityConfig = require(ReplicatedStorage:WaitForChild("DragonAbilit
 local IslandUnlockConfig = require(ReplicatedStorage:WaitForChild("IslandUnlockConfig"))
 local BuildingConfig = require(ReplicatedStorage:WaitForChild("BuildingConfig"))
 local WorkspaceLayout = require(ReplicatedStorage:WaitForChild("WorkspaceLayout"))
+local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
 
 local AchievementEvents = ReplicatedStorage:WaitForChild("AchievementEvents")
 local AchievementUpdate = AchievementEvents:WaitForChild("AchievementUpdate")
@@ -17,9 +18,6 @@ local AchievementCompleted = AchievementEvents:WaitForChild("AchievementComplete
 local AchievementProgressSignal = AchievementEvents:WaitForChild("AchievementProgressSignal")
 local QuestEvents = ReplicatedStorage:WaitForChild("QuestEvents")
 local QuestProgressSignal = QuestEvents:WaitForChild("QuestProgressSignal")
-local TutorialEvents = ReplicatedStorage:WaitForChild("TutorialEvents")
-local GrantTutorialRewardEgg = TutorialEvents:WaitForChild("GrantTutorialRewardEgg")
-local HarvestUIUpdate = ReplicatedStorage:WaitForChild("HarvestEvents"):WaitForChild("HarvestUIUpdate")
 
 local DATASTORE_NAME = AchievementConfig.DataStoreName
 local PURCHASABLE_EGG_TYPES = { "Common", "Forest", "Ice", "Fire", "Crystal" }
@@ -338,26 +336,16 @@ local function normalizeLoadedData(raw)
 end
 
 local function applyReward(player, reward)
-	if typeof(reward) ~= "table" then
+	local applied = RewardService.Grant(player, reward, { Source = "Achievement", NotifyUI = true })
+	if not applied then
 		return
 	end
-	if reward.Type == "DragonEssence" then
-		local essence = player:GetAttribute("DragonEssence") or 0
-		player:SetAttribute("DragonEssence", essence + (reward.Amount or 0))
-		HarvestUIUpdate:FireClient(player, essence + (reward.Amount or 0))
-	elseif reward.Type == "PremiumCurrency" then
-		local gems = player:GetAttribute("PremiumGems") or 0
-		player:SetAttribute("PremiumGems", gems + (reward.Amount or 0))
-	elseif reward.Type == "ExclusiveEgg" and typeof(reward.EggType) == "string" then
-		GrantTutorialRewardEgg:Fire(player, reward.EggType)
-	elseif reward.Type == "Title" and typeof(reward.TitleId) == "string" then
-		local data = getData(player)
-		data.unlockedTitles[reward.TitleId] = true
-		player:SetAttribute("UnlockedTitle_" .. reward.TitleId, true)
-	elseif reward.Type == "CosmeticBadge" and typeof(reward.BadgeId) == "string" then
-		local data = getData(player)
-		data.unlockedBadges[reward.BadgeId] = true
-		player:SetAttribute("UnlockedBadge_" .. reward.BadgeId, true)
+
+	-- Achievements additionally mirror unlocks into their own persisted data table.
+	if applied.Type == "Title" then
+		getData(player).unlockedTitles[applied.TitleId] = true
+	elseif applied.Type == "CosmeticBadge" then
+		getData(player).unlockedBadges[applied.BadgeId] = true
 	end
 end
 

@@ -105,6 +105,10 @@ local function ensureUi()
 	makeAction("CancelButton", "Cancel", UDim2.new(0.54, 0, 0, 228), UDim2.new(0.46, 0, 0, 40), Theme.Colors.StoneDeep, closePopup)
 end
 
+_G.DragonIslandCloseStorageFull = function()
+	closePopup()
+end
+
 local function openPopup(payload)
 	ensureUi()
 	screenGui.Enabled = true

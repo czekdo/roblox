@@ -1,10 +1,12 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DataStoreService = game:GetService("DataStoreService")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 local TutorialData = require(ReplicatedStorage:WaitForChild("TutorialData"))
 local TutorialEvents = ReplicatedStorage:WaitForChild("TutorialEvents")
 local WorkspaceLayout = require(ReplicatedStorage:WaitForChild("WorkspaceLayout"))
+local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
 
 local RequestTutorialState = TutorialEvents:WaitForChild("RequestTutorialState")
 local TutorialStepCompleted = TutorialEvents:WaitForChild("TutorialStepCompleted")
@@ -12,7 +14,6 @@ local TutorialStateUpdated = TutorialEvents:WaitForChild("TutorialStateUpdated")
 local TutorialProgressSignal = TutorialEvents:WaitForChild("TutorialProgressSignal")
 local TutorialSkipRequest = TutorialEvents:WaitForChild("TutorialSkipRequest")
 local TutorialReplayRequest = TutorialEvents:WaitForChild("TutorialReplayRequest")
-local GrantTutorialRewardEgg = TutorialEvents:WaitForChild("GrantTutorialRewardEgg")
 
 local TutorialService = {}
 
@@ -172,40 +173,12 @@ local function saveNow(player)
 	end
 end
 
-local function applyReward(player, reward)
-	if typeof(reward) ~= "table" then
-		return
-	end
-	if reward.DragonEssence then
-		local current = player:GetAttribute("DragonEssence") or 0
-		player:SetAttribute("DragonEssence", current + reward.DragonEssence)
-	end
-	if reward.PremiumGems then
-		local gems = player:GetAttribute("PremiumGems") or 0
-		player:SetAttribute("PremiumGems", gems + reward.PremiumGems)
-	end
-	if reward.BoostSeconds then
-		local expires = os.time() + math.floor(reward.BoostSeconds)
-		local existing = tonumber(player:GetAttribute("TutorialHarvestBoostUntil")) or 0
-		player:SetAttribute("TutorialHarvestBoostUntil", math.max(existing, expires))
-	end
-	if reward.EggType then
-		GrantTutorialRewardEgg:Fire(player, reward.EggType)
-	end
-	if reward.Title then
-		player:SetAttribute("TutorialEquippedTitle", reward.Title)
-	end
-	if reward.Badge then
-		player:SetAttribute("TutorialBadge", reward.Badge)
-	end
-end
-
 local function grantStepReward(player, data, step)
 	if not step or data.StepRewardsClaimed[step.Id] or data.RewardsDisabled then
 		return nil
 	end
 	data.StepRewardsClaimed[step.Id] = true
-	applyReward(player, step.Reward)
+	RewardService.GrantMany(player, step.Reward, { Source = "Tutorial" })
 	return step.Reward
 end
 
@@ -214,7 +187,7 @@ local function grantCompletionRewards(player, data)
 		return
 	end
 	data.RewardClaimed = true
-	applyReward(player, TutorialData.COMPLETION_REWARD)
+	RewardService.GrantMany(player, TutorialData.COMPLETION_REWARD, { Source = "Tutorial" })
 end
 
 local function syncAttributes(player, data)

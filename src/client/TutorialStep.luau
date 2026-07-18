@@ -175,24 +175,4 @@ function TutorialStep.shouldAutoCompleteInfo(playerGui, stepId)
 	return false
 end
 
-function TutorialStep.openRelevantWindow(stepId)
-	if stepId == "ExplainDailyQuests" and _G.DragonIslandOpenDailyQuests then
-		_G.DragonIslandOpenDailyQuests()
-	elseif stepId == "ExplainCodex" and _G.DragonIslandOpenRoster then
-		_G.DragonIslandOpenRoster("Open the Codex tab to track discovered species.")
-	elseif stepId == "IntroduceAscensionGate" and _G.DragonIslandOpenRebirth then
-		_G.DragonIslandOpenRebirth()
-	elseif stepId == "UpgradeKingdom" and _G.DragonIslandOpenBuildings then
-		_G.DragonIslandOpenBuildings()
-	elseif stepId == "BuyFirstEgg" and _G.DragonIslandOpenEggShop then
-		_G.DragonIslandOpenEggShop("Purchase your first Common Egg.")
-	elseif stepId == "EquipFirstDragon" and _G.DragonIslandOpenRoster then
-		_G.DragonIslandOpenRoster("Equip a dragon to begin harvesting.")
-	elseif stepId == "TrainFirstDragon" and _G.DragonIslandOpenTrainingUI then
-		_G.DragonIslandOpenTrainingUI("Send a dragon to the Academy.")
-	elseif stepId == "MergeDragons" and _G.DragonIslandOpenMergeUI then
-		_G.DragonIslandOpenMergeUI("Combine three matching dragons.")
-	end
-end
-
 return TutorialStep

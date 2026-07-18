@@ -38,7 +38,6 @@ local state = nil
 local ui = nil
 local suppressed = false
 local rewardDismissed = false
-local lastEssence = player:GetAttribute("DragonEssence") or 0
 local lastActiveCount = 0
 local lastTrainingSessions = 0
 local lastKingdomLevel = player:GetAttribute("KingdomLevel") or 1
@@ -65,11 +64,24 @@ local function shouldShowGuide()
 end
 
 local function refreshGuide()
-	if not shouldShowGuide() or ui:isPaused() then
+	local stepId = getActiveStepId()
+	if isCompleted() or not stepId then
 		ui:hideGuide()
+		ui:setResumeChipVisible(false)
 		return
 	end
-	local stepId = getActiveStepId()
+	if ui:isPaused() or ui:isRewardVisible() then
+		ui:hideGuide()
+		ui:setResumeChipVisible(false)
+		return
+	end
+	if suppressed then
+		ui:hideGuide()
+		local stepCount = state.stepCount or #(state.steps or {})
+		ui:setResumeChipVisible(true, string.format("Resume Tutorial (Step %d/%d)", state.currentStep or 1, stepCount))
+		return
+	end
+	ui:setResumeChipVisible(false)
 	local showNext = TutorialStep.isInfoStep(stepId)
 	local target = TutorialStep.findTargetForStep(playerGui, stepId)
 	ui:updateStep(state, target, showNext)
@@ -92,12 +104,18 @@ local function applyState(payload, source)
 
 	local wasCompleted = state and state.completed == true
 	local previousStep = state and state.currentStep or 0
+	local previousStepId = getActiveStepId()
 	state = payload
 	player:SetAttribute("TutorialCompleted", payload.completed == true)
 	player:SetAttribute("TutorialStep", payload.currentStep or 1)
 
 	if payload.stepRewardText and source == "live" and (payload.currentStep or 0) > previousStep then
 		ui:showStepReward(payload.stepRewardText)
+	end
+
+	if source == "live" and not suppressed and payload.completed ~= true and payload.activeStep
+		and payload.activeStep.Id ~= previousStepId then
+		ui:showNewGoalToast(payload.activeStep.Title)
 	end
 
 	if payload.completed == true then
@@ -118,15 +136,6 @@ local function applyState(payload, source)
 		end
 	else
 		rewardDismissed = false
-		local stepId = getActiveStepId()
-		if stepId then
-			task.defer(function()
-				if getActiveStepId() == stepId then
-					TutorialStep.openRelevantWindow(stepId)
-					refreshGuide()
-				end
-			end)
-		end
 		refreshGuide()
 	end
 end
@@ -158,14 +167,6 @@ local function detectBuildingProgress(newState)
 end
 
 local function connectSignals()
-	player:GetAttributeChangedSignal("DragonEssence"):Connect(function()
-		local current = player:GetAttribute("DragonEssence") or 0
-		if getActiveStepId() == "CollectDragonEssence" and current > lastEssence then
-			completeStep("CollectDragonEssence")
-		end
-		lastEssence = current
-	end)
-
 	HarvestUIUpdate.OnClientEvent:Connect(function(_essence, activeCount)
 		if typeof(activeCount) == "number" then
 			if getActiveStepId() == "EquipFirstDragon" and activeCount > lastActiveCount and activeCount > 0 then
@@ -194,8 +195,12 @@ local function connectSignals()
 	end)
 
 	HarvestHit.OnClientEvent:Connect(function()
-		if getActiveStepId() == "HarvestWithDragon" then
-			completeStep("HarvestWithDragon")
+		-- Fires only on a real harvest hit, unlike the DragonEssence attribute (which every
+		-- reward source, including this tutorial's own step rewards, also mutates) — so it can't
+		-- be falsely triggered by a reward landing right as a step becomes active.
+		local stepId = getActiveStepId()
+		if stepId == "CollectDragonEssence" or stepId == "HarvestWithDragon" then
+			completeStep(stepId)
 		end
 	end)
 
@@ -261,6 +266,11 @@ function TutorialController.init()
 		TutorialSkipRequest:FireServer()
 	end
 
+	ui.onResume = function()
+		suppressed = false
+		refreshGuide()
+	end
+
 	connectSignals()
 
 	TutorialStateUpdated.OnClientEvent:Connect(function(payload)
@@ -278,10 +288,7 @@ function TutorialController.init()
 
 	_G.DragonIslandSetTutorialSuppressed = function(value)
 		suppressed = value == true
-		ui:setSuppressed(suppressed)
-		if not suppressed then
-			refreshGuide()
-		end
+		refreshGuide()
 	end
 
 	_G.DragonIslandCloseTutorialReward = function()

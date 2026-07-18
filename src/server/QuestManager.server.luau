@@ -10,7 +10,7 @@ local ClaimQuest = QuestEvents:WaitForChild("ClaimQuest")
 local QuestProgressSignal = QuestEvents:WaitForChild("QuestProgressSignal")
 local TutorialEvents = ReplicatedStorage:WaitForChild("TutorialEvents")
 local TutorialProgressSignal = TutorialEvents:WaitForChild("TutorialProgressSignal")
-local AscensionBonusService = require(ServerScriptService:WaitForChild("AscensionBonusService"))
+local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
 
 local dragonsFolder = workspace:WaitForChild("DragonWorkers")
 
@@ -49,7 +49,7 @@ local QUEST_DEFINITIONS = {
 		Title = "Upgrade Dragons",
 		Description = "Upgrade 1 dragon.",
 		Target = 1,
-		Reward = { Type = "TemporaryBoost", BoostId = "QuestEssenceBoost", Amount = 1.25, Duration = 600, Text = "25% Essence Boost (10m)" },
+		Reward = { Type = "TemporaryBoost", BoostId = "QuestEssenceBoost", Multiplier = 1.25, Duration = 600, Text = "25% Essence Boost (10m)" },
 	},
 	{
 		Id = "UnlockIslandExpansions",
@@ -212,23 +212,20 @@ local function applyReward(player, quest)
 		return
 	end
 
-	local reward = quest.Reward
-	if reward.Type == "DragonEssence" then
-		local essence = player:GetAttribute("DragonEssence") or 0
-		local amount = AscensionBonusService.ApplyRewardMultiplier(player, reward.Amount, "QuestRewardBonus")
-		player:SetAttribute("DragonEssence", essence + amount)
-	elseif reward.Type == "Eggs" then
-		local amount = AscensionBonusService.ApplyRewardMultiplier(player, reward.Amount, "QuestRewardBonus")
-		data.QuestEggs = (data.QuestEggs or 0) + amount
-		player:SetAttribute("QuestEggs", data.QuestEggs)
-	elseif reward.Type == "TemporaryBoost" then
-		local expiresAt = os.time() + reward.Duration
-		data.ActiveBoosts[reward.BoostId] = {
-			Multiplier = reward.Amount,
-			ExpiresAt = expiresAt,
+	local applied = RewardService.Grant(player, quest.Reward, { Source = "Quest", ApplyAscensionBonus = true })
+	if not applied then
+		return
+	end
+
+	-- Quest keeps its own in-memory/persisted mirrors (QuestEggs, ActiveBoosts) alongside the
+	-- attributes RewardService writes, so sync them from what was actually applied.
+	if applied.Type == "Eggs" then
+		data.QuestEggs = player:GetAttribute("QuestEggs") or 0
+	elseif applied.Type == "TemporaryBoost" then
+		data.ActiveBoosts[applied.BoostId] = {
+			Multiplier = applied.Multiplier,
+			ExpiresAt = applied.ExpiresAt,
 		}
-		player:SetAttribute(reward.BoostId .. "Multiplier", reward.Amount)
-		player:SetAttribute(reward.BoostId .. "ExpiresAt", expiresAt)
 	end
 end
 

@@ -5,12 +5,12 @@ TutorialData.DATASTORE_NAME = "DragonIslandTutorialV2"
 TutorialData.LEGACY_DATASTORE_NAME = "DragonIslandTutorialV1"
 
 TutorialData.COMPLETION_REWARD = {
-	DragonEssence = 500,
-	PremiumGems = 100,
-	EggType = "Rare",
-	BoostSeconds = 1800,
-	Title = "Island Guide",
-	Badge = "Beginner",
+	{ Type = "DragonEssence", Amount = 500 },
+	{ Type = "PremiumCurrency", Amount = 100 },
+	{ Type = "ExclusiveEgg", EggType = "Rare" },
+	{ Type = "TemporaryBoost", BoostId = "TutorialEssenceBoost", Multiplier = 1.25, Duration = 1800 },
+	{ Type = "EquipTitle", TitleId = "Island Guide" },
+	{ Type = "EquipBadge", BadgeId = "Beginner" },
 }
 
 TutorialData.Steps = {
@@ -20,7 +20,7 @@ TutorialData.Steps = {
 		Description = "Dragon Island Kingdom is yours to grow. This guided tour will teach every core system in a few minutes.",
 		ActionHint = "Tap Continue when you are ready to begin.",
 		Kind = "info",
-		Reward = { DragonEssence = 25 },
+		Reward = { { Type = "DragonEssence", Amount = 25 } },
 	},
 	{
 		Id = "CollectDragonEssence",
@@ -28,7 +28,7 @@ TutorialData.Steps = {
 		Description = "Dragon Essence powers eggs, upgrades, and kingdom growth. Harvest it from crystal nodes on your island.",
 		ActionHint = "Tap a glowing crystal node and let your dragon gather essence.",
 		Kind = "action",
-		Reward = { DragonEssence = 50 },
+		Reward = { { Type = "DragonEssence", Amount = 50 } },
 	},
 	{
 		Id = "BuyFirstEgg",
@@ -37,7 +37,7 @@ TutorialData.Steps = {
 		ActionHint = "Open Egg Shop, then purchase a Common Egg.",
 		Kind = "action",
 		Target = { nav = "EggShopToggle", panel = "CommonEggCard", button = "PurchaseButton" },
-		Reward = { DragonEssence = 75 },
+		Reward = { { Type = "DragonEssence", Amount = 75 } },
 	},
 	{
 		Id = "HatchFirstDragon",
@@ -45,7 +45,7 @@ TutorialData.Steps = {
 		Description = "Place your egg near the hatchery and wait for it to crack open into a dragon companion.",
 		ActionHint = "Stay near your egg until the hatch cinematic completes.",
 		Kind = "action",
-		Reward = { DragonEssence = 100 },
+		Reward = { { Type = "DragonEssence", Amount = 100 } },
 	},
 	{
 		Id = "EquipFirstDragon",
@@ -54,7 +54,7 @@ TutorialData.Steps = {
 		ActionHint = "Open Dragons, select a dragon, then tap Equip.",
 		Kind = "action",
 		Target = { nav = "DragonsToggle", button = "EquipButton" },
-		Reward = { DragonEssence = 75 },
+		Reward = { { Type = "DragonEssence", Amount = 75 } },
 	},
 	{
 		Id = "HarvestWithDragon",
@@ -62,7 +62,7 @@ TutorialData.Steps = {
 		Description = "Send equipped dragons to resource nodes for bonus materials and essence.",
 		ActionHint = "Tap a resource node on your island to start harvesting.",
 		Kind = "action",
-		Reward = { DragonEssence = 100 },
+		Reward = { { Type = "DragonEssence", Amount = 100 } },
 	},
 	{
 		Id = "TrainFirstDragon",
@@ -71,7 +71,7 @@ TutorialData.Steps = {
 		ActionHint = "Open Academy, pick a dragon and program, then start training.",
 		Kind = "action",
 		Target = { nav = "DragonTrainingToggle", button = "StartTrainingButton" },
-		Reward = { DragonEssence = 125 },
+		Reward = { { Type = "DragonEssence", Amount = 125 } },
 	},
 	{
 		Id = "MergeDragons",
@@ -80,7 +80,7 @@ TutorialData.Steps = {
 		ActionHint = "Open Merge, select three matching dragons, then tap Merge Dragons.",
 		Kind = "action",
 		Target = { nav = "DragonMergeToggle", button = "MergeButton" },
-		Reward = { DragonEssence = 150 },
+		Reward = { { Type = "DragonEssence", Amount = 150 } },
 	},
 	{
 		Id = "UpgradeKingdom",
@@ -89,7 +89,7 @@ TutorialData.Steps = {
 		ActionHint = "Open Buildings, select a structure, then upgrade it once.",
 		Kind = "action",
 		Target = { nav = "BuildingsToggle", button = "ActionButton" },
-		Reward = { DragonEssence = 150, PremiumGems = 15 },
+		Reward = { { Type = "DragonEssence", Amount = 150 }, { Type = "PremiumCurrency", Amount = 15 } },
 	},
 	{
 		Id = "UnlockSecondIsland",
@@ -97,7 +97,7 @@ TutorialData.Steps = {
 		Description = "Biome islands unlock rare resources and new adventures. Forest Island is your first expansion.",
 		ActionHint = "Travel to Forest Island's shrine and pay the unlock cost.",
 		Kind = "action",
-		Reward = { DragonEssence = 200, PremiumGems = 25 },
+		Reward = { { Type = "DragonEssence", Amount = 200 }, { Type = "PremiumCurrency", Amount = 25 } },
 	},
 	{
 		Id = "ExplainDailyQuests",
@@ -106,7 +106,7 @@ TutorialData.Steps = {
 		ActionHint = "Open Quests to preview today's objectives and rewards.",
 		Kind = "info",
 		Target = { nav = "DailyQuestsToggle" },
-		Reward = { DragonEssence = 50 },
+		Reward = { { Type = "DragonEssence", Amount = 50 } },
 	},
 	{
 		Id = "ExplainCodex",
@@ -115,7 +115,7 @@ TutorialData.Steps = {
 		ActionHint = "Open Dragons, then switch to the Codex tab.",
 		Kind = "info",
 		Target = { nav = "DragonsToggle", button = "CodexTab" },
-		Reward = { DragonEssence = 50 },
+		Reward = { { Type = "DragonEssence", Amount = 50 } },
 	},
 	{
 		Id = "IntroduceAscensionGate",
@@ -124,7 +124,7 @@ TutorialData.Steps = {
 		ActionHint = "Open Ascension to preview requirements and rewards.",
 		Kind = "info",
 		Target = { nav = "RebirthToggle" },
-		Reward = { DragonEssence = 75, PremiumGems = 20 },
+		Reward = { { Type = "DragonEssence", Amount = 75 }, { Type = "PremiumCurrency", Amount = 20 } },
 	},
 }
 
@@ -167,28 +167,25 @@ function TutorialData.CopyStepsForClient()
 	return result
 end
 
-function TutorialData.FormatReward(reward)
-	if typeof(reward) ~= "table" then
+function TutorialData.FormatReward(rewards)
+	if typeof(rewards) ~= "table" then
 		return ""
 	end
 	local parts = {}
-	if reward.DragonEssence then
-		table.insert(parts, "+" .. tostring(reward.DragonEssence) .. " Essence")
-	end
-	if reward.PremiumGems then
-		table.insert(parts, "+" .. tostring(reward.PremiumGems) .. " Gems")
-	end
-	if reward.EggType then
-		table.insert(parts, "+1 " .. reward.EggType .. " Egg")
-	end
-	if reward.BoostSeconds then
-		table.insert(parts, "Starter Boost")
-	end
-	if reward.Title then
-		table.insert(parts, "Title: " .. reward.Title)
-	end
-	if reward.Badge then
-		table.insert(parts, reward.Badge .. " Badge")
+	for _, reward in rewards do
+		if reward.Type == "DragonEssence" then
+			table.insert(parts, "+" .. tostring(reward.Amount) .. " Essence")
+		elseif reward.Type == "PremiumCurrency" then
+			table.insert(parts, "+" .. tostring(reward.Amount) .. " Gems")
+		elseif reward.Type == "ExclusiveEgg" then
+			table.insert(parts, "+1 " .. tostring(reward.EggType) .. " Egg")
+		elseif reward.Type == "TemporaryBoost" then
+			table.insert(parts, "Starter Boost")
+		elseif reward.Type == "EquipTitle" then
+			table.insert(parts, "Title: " .. tostring(reward.TitleId))
+		elseif reward.Type == "EquipBadge" then
+			table.insert(parts, tostring(reward.BadgeId) .. " Badge")
+		end
 	end
 	return table.concat(parts, "  •  ")
 end

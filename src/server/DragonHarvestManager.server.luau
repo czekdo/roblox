@@ -1730,7 +1730,9 @@ local function performHarvestHit(player, dragon, node)
 	local baseAmount = stats.CarryCapacity
 	local isCritical = math.random() < stats.CriticalHarvestChance
 	local harvestAmount = isCritical and math.floor(baseAmount * stats.CriticalMultiplier + 0.5) or baseAmount
-	local essenceBoost = getActiveBoostMultiplier(player, "QuestEssenceBoost") * getActiveBoostMultiplier(player, "CraftEssenceBoost")
+	local essenceBoost = getActiveBoostMultiplier(player, "QuestEssenceBoost")
+		* getActiveBoostMultiplier(player, "CraftEssenceBoost")
+		* getActiveBoostMultiplier(player, "TutorialEssenceBoost")
 	local harvestBonus = 1 + AscensionBonusService.GetBonus(player, "HarvestMultiplier")
 	harvestAmount = math.max(1, math.floor(harvestAmount * essenceBoost * harvestBonus + 0.5))
 

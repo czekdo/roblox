@@ -84,6 +84,7 @@ local function playFadeIn()
 		return
 	end
 	isFaded = true
+	screenGui.Enabled = true
 	overlay.Visible = true
 	tweenOverlay(0, FADE_IN_TIME, 0)
 end
@@ -149,6 +150,7 @@ local function playFadeOut()
 	tweenOverlay(1, FADE_OUT_TIME, 1)
 	overlay.Visible = false
 	isFaded = false
+	screenGui.Enabled = false
 	playArrivalBurst()
 end
 

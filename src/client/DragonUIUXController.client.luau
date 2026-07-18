@@ -81,6 +81,10 @@ local windows = {
 	DailyQuests = { label = "Quests", gui = "DailyQuestUI", panel = "QuestPanel", dim = "DimBackground", opener = "DragonIslandOpenDailyQuests", closer = "DragonIslandCloseDailyQuests", icon = Theme.Icons.Scroll },
 	Achievements = { label = "Achievements", gui = "AchievementUI", panel = "AchievementPanel", dim = "DimBackground", opener = "DragonIslandOpenAchievements", closer = "DragonIslandCloseAchievements", icon = Theme.Icons.Trophy },
 	Rebirth = { label = "Ascension", gui = "RebirthUI", panel = "RebirthPanel", dim = "DimBackground", opener = "DragonIslandOpenRebirth", closer = "DragonIslandCloseRebirth", icon = Theme.Icons.Rebirth },
+	-- Not part of navOrder (no nav button): opened only by its own popup event, but registered
+	-- here so Escape's closeTopWindow can find and close it instead of falling through to the
+	-- releaseAllInput fallback, which never actually hides the panel.
+	StorageFull = { label = "Storage Full", gui = "DragonStorageFullUI", panel = "StorageFullPanel", dim = "DimBackground", closer = "DragonIslandCloseStorageFull" },
 }
 
 local navButtons = {}
@@ -464,16 +468,34 @@ end
 _G.DragonIslandOpenSettings = function()
 	openExtrasPanel(
 		"Settings",
-		"Gameplay helpers and preferences. Replay the guided tutorial anytime to relearn core systems.",
+		"Gameplay helpers and preferences. Lost the tutorial guide? Use the \"Resume Tutorial\" chip in the corner of the screen instead of restarting.",
 		{
 			{
 				Name = "ReplayTutorialButton",
-				Text = "Replay Tutorial",
+				Text = "Restart Tutorial from Step 1",
 				Bg = Theme.Colors.Crystal,
+				CloseOnClick = false,
 				OnClick = function()
-					if _G.DragonIslandReplayTutorial then
-						_G.DragonIslandReplayTutorial()
-					end
+					openExtrasPanel(
+						"Restart Tutorial?",
+						"This restarts the guided tour from Step 1 and re-plays every step. If the tutorial guide just went missing, close this and use the \"Resume Tutorial\" chip instead — it brings back your current step without losing progress.",
+						{
+							{
+								Name = "ConfirmRestartTutorial",
+								Text = "Yes, Restart from Step 1",
+								Bg = Theme.Colors.Danger,
+								OnClick = function()
+									if _G.DragonIslandReplayTutorial then
+										_G.DragonIslandReplayTutorial()
+									end
+								end,
+							},
+							{
+								Name = "CancelRestartTutorial",
+								Text = "Cancel",
+							},
+						}
+					)
 				end,
 			},
 		}

@@ -23,6 +23,7 @@ function TutorialUI.new(playerGui)
 	self.onNext = nil
 	self.onSkipConfirm = nil
 	self.onSkipCancel = nil
+	self.onResume = nil
 	self:_build()
 	return self
 end
@@ -204,6 +205,34 @@ function TutorialUI:_build()
 		TextSize = 12, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextGold,
 		XAlign = Enum.TextXAlignment.Center, ZIndex = 21,
 	})
+
+	self.goalToast = Theme.createFrame({
+		Name = "GoalToast", Parent = screenGui,
+		Size = UDim2.fromOffset(280, 40), Position = UDim2.new(0.5, 0, 0, 136),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Bg = Theme.Colors.Navy, Corner = Theme.Corner.Medium, Visible = false, ZIndex = 20,
+	})
+	Theme.stroke(self.goalToast, Theme.Colors.Crystal, 1.5, 0.2)
+	self.goalToastLabel = Theme.createText({
+		Name = "GoalText", Parent = self.goalToast,
+		Text = "", Size = UDim2.new(1, -16, 1, 0), Position = UDim2.fromOffset(8, 0),
+		TextSize = 12, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextGold,
+		XAlign = Enum.TextXAlignment.Center, ZIndex = 21,
+	})
+
+	local resumeChip = Theme.createButton({
+		Name = "ResumeChip", Parent = screenGui, Text = "Resume Tutorial",
+		Size = UDim2.fromOffset(200, 36), Position = UDim2.new(0, HINT_MARGIN, 1, -HINT_MARGIN),
+		AnchorPoint = Vector2.new(0, 1),
+		Bg = Theme.Colors.Navy, TextSize = 13, ZIndex = 16, Visible = false,
+		OnClick = function()
+			if self.onResume then
+				self.onResume()
+			end
+		end,
+	})
+	Theme.stroke(resumeChip, Theme.Colors.GoldBright, 1.5, 0.2)
+	self.resumeChip = resumeChip
 
 	self:_buildSkipConfirm()
 	self:_buildCompletionPanel()
@@ -451,6 +480,16 @@ function TutorialUI:hideGuide()
 	self:clearTargetHighlight()
 end
 
+function TutorialUI:setResumeChipVisible(visible, stepText)
+	if not self.resumeChip then
+		return
+	end
+	if stepText then
+		self.resumeChip.Text = stepText
+	end
+	self.resumeChip.Visible = visible == true
+end
+
 function TutorialUI:showSkipConfirm()
 	Theme.tweenOpen(self.skipPanel, self.skipDim)
 end
@@ -482,6 +521,30 @@ function TutorialUI:showStepReward(text)
 		end
 	end)
 	self:playSound("rbxassetid://12221967", 0.35)
+end
+
+function TutorialUI:showNewGoalToast(title)
+	if typeof(title) ~= "string" or title == "" then
+		return
+	end
+	self.goalToastLabel.Text = "🎯 New Goal: " .. title
+	self.goalToast.Visible = true
+	self.goalToast.BackgroundTransparency = 0.15
+	self.goalToast.Position = UDim2.new(0.5, 0, 0, 120)
+	TweenService:Create(self.goalToast, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0.5, 0, 0, 136),
+		BackgroundTransparency = 0.02,
+	}):Play()
+	task.delay(2.6, function()
+		if self.goalToast and self.goalToast.Visible then
+			TweenService:Create(self.goalToast, TweenInfo.new(0.2), { BackgroundTransparency = 1 }):Play()
+			task.delay(0.22, function()
+				if self.goalToast then
+					self.goalToast.Visible = false
+				end
+			end)
+		end
+	end)
 end
 
 function TutorialUI:playSound(soundId, volume)
@@ -531,14 +594,23 @@ end
 
 function TutorialUI:showCompletionPanel(rewardInfo, message)
 	local lines = { message or "You finished the tutorial!" }
-	if rewardInfo then
+	if typeof(rewardInfo) == "table" then
 		table.insert(lines, "")
-		if rewardInfo.DragonEssence then table.insert(lines, "+" .. tostring(rewardInfo.DragonEssence) .. " Dragon Essence") end
-		if rewardInfo.PremiumGems then table.insert(lines, "+" .. tostring(rewardInfo.PremiumGems) .. " Gems") end
-		if rewardInfo.EggType then table.insert(lines, "+1 " .. rewardInfo.EggType .. " Egg") end
-		if rewardInfo.BoostSeconds then table.insert(lines, "Starter Harvest Boost (30 min)") end
-		if rewardInfo.Title then table.insert(lines, "Title: " .. rewardInfo.Title) end
-		if rewardInfo.Badge then table.insert(lines, rewardInfo.Badge .. " Badge") end
+		for _, reward in rewardInfo do
+			if reward.Type == "DragonEssence" then
+				table.insert(lines, "+" .. tostring(reward.Amount) .. " Dragon Essence")
+			elseif reward.Type == "PremiumCurrency" then
+				table.insert(lines, "+" .. tostring(reward.Amount) .. " Gems")
+			elseif reward.Type == "ExclusiveEgg" then
+				table.insert(lines, "+1 " .. tostring(reward.EggType) .. " Egg")
+			elseif reward.Type == "TemporaryBoost" then
+				table.insert(lines, "Starter Harvest Boost (30 min)")
+			elseif reward.Type == "EquipTitle" then
+				table.insert(lines, "Title: " .. tostring(reward.TitleId))
+			elseif reward.Type == "EquipBadge" then
+				table.insert(lines, tostring(reward.BadgeId) .. " Badge")
+			end
+		end
 	end
 	self.rewardBodyLabel.Text = table.concat(lines, "\n")
 	self:hideGuide()
@@ -556,11 +628,6 @@ function TutorialUI:closeRewardPanel()
 	end
 end
 
-function TutorialUI:setSuppressed(suppressed)
-	if suppressed then
-		self:hideGuide()
-	end
-end
 
 function TutorialUI:isRewardVisible()
 	return self.rewardPanel and self.rewardPanel.Visible
@@ -588,7 +655,9 @@ function TutorialUI:tick(deltaTime, target)
 		self.arrow.Position = base + UDim2.fromOffset(0, math.sin(self.arrowTime * 6) * 0.8)
 	end
 	if self.targetHighlightStroke and self.targetHighlightStroke.Parent then
-		self.targetHighlightStroke.Transparency = 0.1 + (math.sin(self.arrowTime * 4) + 1) * 0.15
+		local pulse = (math.sin(self.arrowTime * 4.5) + 1) * 0.5
+		self.targetHighlightStroke.Transparency = 0.05 + pulse * 0.45
+		self.targetHighlightStroke.Thickness = 2.5 + pulse * 1.5
 	end
 	if target then
 		self:positionPanelNearTarget(target)
@@ -597,6 +666,7 @@ end
 
 function TutorialUI:shutdown()
 	self:hideGuide()
+	self:setResumeChipVisible(false)
 	self:closeRewardPanel()
 	self.screenGui.Enabled = false
 end

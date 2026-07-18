@@ -1,14 +1,14 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 local WorkshopCraftConfig = require(ReplicatedStorage:WaitForChild("WorkshopCraftConfig"))
 local WorkspaceLayout = require(ReplicatedStorage:WaitForChild("WorkspaceLayout"))
+local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
 local CraftEvents = ReplicatedStorage:WaitForChild("CraftEvents")
 local RequestCraftData = CraftEvents:WaitForChild("RequestCraftData")
 local CraftItem = CraftEvents:WaitForChild("CraftItem")
 local CraftStateUpdated = CraftEvents:WaitForChild("CraftStateUpdated")
-local KingdomEvents = ReplicatedStorage:WaitForChild("KingdomEvents")
-local GrantDecoration = KingdomEvents:WaitForChild("GrantDecoration")
 
 local function getWorkshopTier(player)
 	local island = WorkspaceLayout.GetPlayerIsland(player)
@@ -45,19 +45,11 @@ local function sendState(player, message)
 end
 
 local function applyReward(player, reward)
-	if reward.Type == "DragonEssence" then
-		local essence = player:GetAttribute("DragonEssence") or 0
-		player:SetAttribute("DragonEssence", essence + reward.Amount)
-	elseif reward.Type == "TemporaryBoost" then
-		local expiresAt = os.time() + reward.Duration
-		player:SetAttribute(reward.BoostId .. "Multiplier", reward.Multiplier)
-		player:SetAttribute(reward.BoostId .. "ExpiresAt", expiresAt)
-	elseif reward.Type == "QuestEgg" then
-		local questEggs = player:GetAttribute("QuestEggs") or 0
-		player:SetAttribute("QuestEggs", questEggs + (reward.Amount or 1))
-	elseif reward.Type == "Decoration" then
-		GrantDecoration:Fire(player, reward.DecorationId)
+	-- "QuestEgg" is Craft's historical name for the shared "Eggs" reward type.
+	if reward.Type == "QuestEgg" then
+		reward = { Type = "Eggs", Amount = reward.Amount or 1 }
 	end
+	RewardService.Grant(player, reward, { Source = "Craft" })
 end
 
 RequestCraftData.OnServerInvoke = function(player)
