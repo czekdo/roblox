@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local TutorialData = require(ReplicatedStorage:WaitForChild("TutorialData"))
 local TutorialStep = require(script.Parent:WaitForChild("TutorialStep"))
 local TutorialUI = require(script.Parent:WaitForChild("TutorialUI"))
@@ -287,9 +288,13 @@ function TutorialController.init()
 	end
 
 	_G.DragonIslandSetTutorialSuppressed = function(value)
+		UIBridge.SetTutorialSuppressed(value)
+	end
+
+	UIBridge.Subscribe("TutorialSuppressedChanged", function(value)
 		suppressed = value == true
 		refreshGuide()
-	end
+	end)
 
 	_G.DragonIslandCloseTutorialReward = function()
 		if ui:isRewardVisible() then
@@ -300,6 +305,7 @@ function TutorialController.init()
 		end
 		return false
 	end
+	UIBridge.RegisterCommand("CloseTutorialReward", _G.DragonIslandCloseTutorialReward)
 
 	_G.DragonIslandReplayTutorial = function()
 		TutorialReplayRequest:FireServer()
@@ -307,6 +313,7 @@ function TutorialController.init()
 		suppressed = false
 		ui.screenGui.Enabled = true
 	end
+	UIBridge.RegisterCommand("ReplayTutorial", _G.DragonIslandReplayTutorial)
 
 	RunService.RenderStepped:Connect(function(deltaTime)
 		if not shouldShowGuide() or ui:isPaused() then

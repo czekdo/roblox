@@ -285,6 +285,10 @@ local function createUpgradeUI()
 end
 
 _G.DragonIslandSetWorldPanelsSuppressed = function(suppressed)
+	UIBridge.SetWorldPanelsSuppressed(suppressed)
+end
+
+UIBridge.Subscribe("WorldPanelsSuppressedChanged", function(suppressed)
 	local playerGui = player:WaitForChild("PlayerGui")
 	local invGui = playerGui:FindFirstChild("DragonInventoryUI")
 	if invGui then
@@ -297,7 +301,7 @@ _G.DragonIslandSetWorldPanelsSuppressed = function(suppressed)
 			updateUpgradeUI()
 		end
 	end
-end
+end)
 
 createUpgradeUI()
 

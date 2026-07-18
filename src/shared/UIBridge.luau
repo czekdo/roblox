@@ -157,4 +157,46 @@ function UIBridge.CloseAllPanels()
 	end
 end
 
+-- ============================================================
+-- Named broadcast helpers — thin, discoverable wrappers over
+-- Subscribe/Fire so callers don't need to know/guess a magic event
+-- name string. The owning script (TutorialController for the first
+-- two, HarvestClient for the third) is expected to Subscribe.
+-- ============================================================
+
+function UIBridge.SetTutorialSuppressed(value)
+	UIBridge.Fire("TutorialSuppressedChanged", value == true)
+end
+
+function UIBridge.SetWorldPanelsSuppressed(value)
+	UIBridge.Fire("WorldPanelsSuppressedChanged", value == true)
+end
+
+function UIBridge.Notify(message, color)
+	UIBridge.Fire("Notify", message, color)
+end
+
+-- ============================================================
+-- Commands — single-owner function slots for direct request/response
+-- calls where the caller needs the callee's actual return value
+-- (unlike Subscribe/Fire, which is fire-and-forget to every listener
+-- and doesn't collect results).
+-- ============================================================
+
+local commands = {}
+
+function UIBridge.RegisterCommand(name, fn)
+	if typeof(name) == "string" and name ~= "" and typeof(fn) == "function" then
+		commands[name] = fn
+	end
+end
+
+function UIBridge.RunCommand(name, ...)
+	local fn = commands[name]
+	if not fn then
+		return nil
+	end
+	return fn(...)
+end
+
 return UIBridge

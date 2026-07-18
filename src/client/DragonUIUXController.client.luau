@@ -580,8 +580,15 @@ task.spawn(function()
 	end
 end)
 
-_G.DragonIslandNotify = notify
-_G.DragonIslandFormatCompact = formatCompact
+_G.DragonIslandNotify = function(message, color)
+	UIBridge.Notify(message, color)
+end
+
+UIBridge.Subscribe("Notify", notify)
+
+-- DragonIslandFormatCompact removed: it was a re-export of Theme.formatCompact with zero
+-- external callers (every client script already requires DragonUITheme directly).
+
 _G.DragonIslandIsModalOpen = UIBridge.IsModalOpen
 
 _G.DragonIslandResetModalRegistry = UIBridge.ResetModalRegistry
