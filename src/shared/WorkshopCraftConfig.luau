@@ -6,7 +6,7 @@ local WorkshopCraftConfig = {
 			Description = "25% essence gain for 10 minutes.",
 			Tier = 1,
 			Cost = 150,
-			Reward = { Type = "TemporaryBoost", BoostId = "CraftEssenceBoost", Multiplier = 1.25, Duration = 600, Text = "25% Essence Boost (10m)" },
+			Reward = { Type = "InventoryItem", ItemId = "EssenceBoost", Amount = 1, Text = "+1 Essence Boost Potion" },
 		},
 		{
 			Id = "DragonSnack",
@@ -30,7 +30,7 @@ local WorkshopCraftConfig = {
 			Description = "Dragons harvest 40% faster for 15 minutes.",
 			Tier = 2,
 			Cost = 500,
-			Reward = { Type = "TemporaryBoost", BoostId = "CraftHarvestBoost", Multiplier = 1.4, Duration = 900, Text = "40% Harvest Speed (15m)" },
+			Reward = { Type = "InventoryItem", ItemId = "HarvestElixir", Amount = 1, Text = "+1 Harvest Elixir" },
 		},
 		{
 			Id = "DragonBanner",
@@ -62,7 +62,7 @@ local WorkshopCraftConfig = {
 			Description = "Dragons harvest 50% faster for 20 minutes.",
 			Tier = 4,
 			Cost = 3200,
-			Reward = { Type = "TemporaryBoost", BoostId = "CraftHarvestBoost", Multiplier = 1.5, Duration = 1200, Text = "50% Harvest Speed (20m)" },
+			Reward = { Type = "InventoryItem", ItemId = "MasterworkElixir", Amount = 1, Text = "+1 Masterwork Elixir" },
 		},
 		{
 			Id = "EssenceSurge",
@@ -70,7 +70,7 @@ local WorkshopCraftConfig = {
 			Description = "35% essence gain for 15 minutes.",
 			Tier = 4,
 			Cost = 3000,
-			Reward = { Type = "TemporaryBoost", BoostId = "CraftEssenceBoost", Multiplier = 1.35, Duration = 900, Text = "35% Essence Boost (15m)" },
+			Reward = { Type = "InventoryItem", ItemId = "EssenceSurge", Amount = 1, Text = "+1 Essence Surge" },
 		},
 		{
 			Id = "GoldenStatueCraft",
@@ -110,7 +110,7 @@ local WorkshopCraftConfig = {
 			Description = "Dragons harvest 60% faster for 25 minutes.",
 			Tier = 6,
 			Cost = 9500,
-			Reward = { Type = "TemporaryBoost", BoostId = "CraftHarvestBoost", Multiplier = 1.6, Duration = 1500, Text = "60% Harvest Speed (25m)" },
+			Reward = { Type = "InventoryItem", ItemId = "GrandElixir", Amount = 1, Text = "+1 Grand Elixir" },
 		},
 		{
 			Id = "PlatinumCrown",
@@ -142,7 +142,7 @@ local WorkshopCraftConfig = {
 			Description = "50% essence gain for 30 minutes.",
 			Tier = 8,
 			Cost = 28000,
-			Reward = { Type = "TemporaryBoost", BoostId = "CraftEssenceBoost", Multiplier = 1.5, Duration = 1800, Text = "50% Essence Boost (30m)" },
+			Reward = { Type = "InventoryItem", ItemId = "SovereignEssence", Amount = 1, Text = "+1 Sovereign Essence" },
 		},
 		{
 			Id = "ObsidianThrone",

@@ -6,6 +6,10 @@ local HarvestConfig = require(ReplicatedStorage:WaitForChild("HarvestConfig"))
 local DragonAbilityConfig = require(ReplicatedStorage:WaitForChild("DragonAbilityConfig"))
 local DragonEggConfig = require(ReplicatedStorage:WaitForChild("DragonEggConfig"))
 local DragonInventoryConfig = require(ReplicatedStorage:WaitForChild("DragonInventoryConfig"))
+local InventoryEvents = ReplicatedStorage:WaitForChild("InventoryEvents")
+local RequestInventoryData = InventoryEvents:WaitForChild("RequestInventoryData")
+local UseInventoryItem = InventoryEvents:WaitForChild("UseInventoryItem")
+local InventoryStateUpdated = InventoryEvents:WaitForChild("InventoryStateUpdated")
 local HarvestEvents = ReplicatedStorage:WaitForChild("HarvestEvents")
 local RequestDragonMergeData = HarvestEvents:WaitForChild("RequestDragonMergeData")
 local UpgradeDragon = HarvestEvents:WaitForChild("UpgradeDragon")
@@ -30,6 +34,9 @@ local headerSubtitle
 local sidebarButtons = {}
 local listRows = {}
 local codexRows = {}
+local inventoryRows = {}
+local inventoryState = { items = {} }
+local selectedItemId
 local rosterState = {
 	dragons = {},
 	essence = 0,
@@ -61,6 +68,7 @@ local sidebarItems = {
 
 local renderDragonDetail
 local renderCodexDetail
+local renderInventoryDetail
 
 local function findDragonModel(dragonId)
 	for _, model in dragonsFolder:GetChildren() do
@@ -228,6 +236,7 @@ local function clearContent()
 	end
 	table.clear(listRows)
 	table.clear(codexRows)
+	table.clear(inventoryRows)
 end
 
 local function createSplitLayout()
@@ -865,16 +874,164 @@ local function renderCodexTab()
 	renderCodexDetail(detailPanel, selectedSpeciesId)
 end
 
+local function getInventoryItemById(itemId)
+	for _, item in inventoryState.items do
+		if item.itemId == itemId then
+			return item
+		end
+	end
+	return nil
+end
+
+local function applyInventoryPayload(payload)
+	if typeof(payload) ~= "table" then
+		return false
+	end
+	inventoryState.items = payload.items or {}
+	return true
+end
+
+local function refreshInventory()
+	local success, payload = pcall(function()
+		return RequestInventoryData:InvokeServer()
+	end)
+	if success then
+		applyInventoryPayload(payload)
+	end
+end
+
+local function populateInventoryListRow(row, item)
+	row.Text = ""
+	local iconFrame = Theme.createIconFrame(row, Theme.Icons.Backpack, 36, 8)
+	iconFrame.Position = UDim2.fromOffset(6, 8)
+
+	Theme.createText({
+		Name = "RowName", Parent = row,
+		Text = item.displayName,
+		Size = UDim2.new(1, -58, 0, 18), Position = UDim2.fromOffset(50, 6),
+		TextSize = 13, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextLight,
+		Wrapped = false, Truncate = Enum.TextTruncate.AtEnd, ZIndex = 9,
+	})
+
+	Theme.createText({
+		Name = "RowMeta", Parent = row,
+		Text = "Owned x" .. tostring(item.count),
+		Size = UDim2.new(1, -58, 0, 16), Position = UDim2.fromOffset(50, 26),
+		TextSize = 11, Font = Theme.Fonts.Regular, Color = Theme.Colors.TextGold, ZIndex = 9,
+	})
+end
+
+local function highlightInventoryRows()
+	for itemId, row in inventoryRows do
+		Theme.setListRowSelected(row, itemId == selectedItemId, Theme.Colors.Crystal)
+	end
+end
+
+local function selectInventoryItem(itemId)
+	selectedItemId = itemId
+	highlightInventoryRows()
+	local listHost = contentFrame and contentFrame:FindFirstChild("ListHost")
+	local detailPanel = listHost and listHost:FindFirstChild("DetailPanel")
+	if detailPanel then
+		renderInventoryDetail(detailPanel, getInventoryItemById(itemId))
+	end
+end
+
+renderInventoryDetail = function(detailPanel, item)
+	for _, child in detailPanel:GetChildren() do
+		if child:IsA("GuiObject") and child.Name ~= "UIPadding" then
+			child:Destroy()
+		end
+	end
+
+	if not item then
+		Theme.createEmptyState(
+			detailPanel,
+			Theme.Icons.Backpack,
+			"Select an Item",
+			"Choose a potion from the list to view its effect and use it.",
+			8
+		)
+		return
+	end
+
+	local iconFrame = Theme.createIconFrame(detailPanel, Theme.Icons.Backpack, 88, 8)
+	iconFrame.Position = UDim2.new(0.5, 0, 0, 0)
+	iconFrame.AnchorPoint = Vector2.new(0.5, 0)
+
+	Theme.createText({
+		Name = "DetailName", Parent = detailPanel,
+		Text = item.displayName,
+		Size = UDim2.new(1, 0, 0, 26), Position = UDim2.fromOffset(0, 96),
+		TextSize = 20, Font = Theme.Fonts.Title, Color = Theme.Colors.TextLight,
+		XAlign = Enum.TextXAlignment.Center, ZIndex = 9,
+	})
+
+	Theme.createText({
+		Name = "DetailMeta", Parent = detailPanel,
+		Text = "Owned x" .. tostring(item.count),
+		Size = UDim2.new(1, 0, 0, 18), Position = UDim2.fromOffset(0, 122),
+		TextSize = 12, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextGold,
+		XAlign = Enum.TextXAlignment.Center, ZIndex = 9,
+	})
+
+	Theme.createText({
+		Name = "DetailDescription", Parent = detailPanel,
+		Text = item.description or "",
+		Size = UDim2.new(1, -16, 0, 60), Position = UDim2.fromOffset(8, 150),
+		TextSize = 13, Font = Theme.Fonts.Body, Color = Theme.Colors.Text,
+		Wrapped = true, XAlign = Enum.TextXAlignment.Center, ZIndex = 9,
+	})
+
+	Theme.createButton({
+		Name = "UseButton", Parent = detailPanel, Text = "Use",
+		Size = UDim2.fromOffset(160, 32), Position = UDim2.new(0.5, 0, 1, -8),
+		AnchorPoint = Vector2.new(0.5, 1), Bg = Theme.Colors.Success, TextSize = 13, ZIndex = 10,
+		OnClick = function()
+			UseInventoryItem:FireServer(item.itemId)
+		end,
+	})
+end
+
 local function renderInventoryTab()
 	clearContent()
-	setHeader("DRAGON INVENTORY", "Gear, boosts, and workshop items")
-	Theme.createEmptyState(
-		contentFrame,
-		Theme.Icons.Backpack,
-		"Inventory Coming Soon",
-		"Track dragon gear, boosts, and owned items from the Workshop and Quest rewards.",
-		8
-	)
+	setHeader("DRAGON INVENTORY", "Potions crafted at the Workshop")
+	refreshInventory()
+
+	if #inventoryState.items == 0 then
+		Theme.createEmptyState(
+			contentFrame,
+			Theme.Icons.Backpack,
+			"No Items Yet",
+			"Craft potions at the Workshop, then use them here whenever you're ready.",
+			8
+		)
+		return
+	end
+
+	local listScroll, detailPanel = createSplitLayout()
+
+	if not selectedItemId or not getInventoryItemById(selectedItemId) then
+		selectedItemId = inventoryState.items[1].itemId
+	end
+
+	for index, item in ipairs(inventoryState.items) do
+		local row = Theme.createListRow(listScroll, {
+			Name = "InventoryRow_" .. item.itemId,
+			Text = "",
+			Height = 52,
+			LayoutOrder = index,
+			ZIndex = 8,
+			OnClick = function()
+				selectInventoryItem(item.itemId)
+			end,
+		})
+		populateInventoryListRow(row, item)
+		inventoryRows[item.itemId] = row
+	end
+
+	highlightInventoryRows()
+	renderInventoryDetail(detailPanel, getInventoryItemById(selectedItemId))
 end
 
 local function renderLeaderboardsTab()
@@ -1113,6 +1270,15 @@ end)
 UpgradeDragon.OnClientEvent:Connect(function()
 	if rosterPanel and rosterPanel.Visible then
 		refreshRoster()
+	end
+end)
+
+InventoryStateUpdated.OnClientEvent:Connect(function(payload)
+	if applyInventoryPayload(payload) and rosterPanel and rosterPanel.Visible and activeTab == "Inventory" then
+		renderInventoryTab()
+	end
+	if payload and payload.message and _G.DragonIslandNotify then
+		_G.DragonIslandNotify(payload.message, Theme.Colors.Navy)
 	end
 end)
 

@@ -7,11 +7,13 @@ local TutorialEvents = ReplicatedStorage:WaitForChild("TutorialEvents")
 local GrantTutorialRewardEgg = TutorialEvents:WaitForChild("GrantTutorialRewardEgg")
 local KingdomEvents = ReplicatedStorage:WaitForChild("KingdomEvents")
 local GrantDecoration = KingdomEvents:WaitForChild("GrantDecoration")
+local InventoryEvents = ReplicatedStorage:WaitForChild("InventoryEvents")
+local GrantInventoryItem = InventoryEvents:WaitForChild("GrantInventoryItem")
 local HarvestUIUpdate = ReplicatedStorage:WaitForChild("HarvestEvents"):WaitForChild("HarvestUIUpdate")
 
 -- Reward shape: { Type = string, ...type-specific fields, Text = string? }
 -- Supported types: DragonEssence, PremiumCurrency, Eggs, ExclusiveEgg, TemporaryBoost,
--- Title, EquipTitle, CosmeticBadge, EquipBadge, Decoration.
+-- Title, EquipTitle, CosmeticBadge, EquipBadge, Decoration, InventoryItem.
 -- context = { Source = string, ApplyAscensionBonus = boolean?, NotifyUI = boolean? }
 
 local RewardService = {}
@@ -95,6 +97,12 @@ end
 handlers.Decoration = function(player, reward, _context)
 	GrantDecoration:Fire(player, reward.DecorationId)
 	return { Type = "Decoration", DecorationId = reward.DecorationId }
+end
+
+handlers.InventoryItem = function(player, reward, _context)
+	local amount = reward.Amount or 1
+	GrantInventoryItem:Fire(player, reward.ItemId, amount)
+	return { Type = "InventoryItem", ItemId = reward.ItemId, Amount = amount }
 end
 
 -- Extension point: RewardService.RegisterHandler("NewType", function(player, reward, context) ... end)
