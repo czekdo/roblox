@@ -4,6 +4,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -90,7 +91,6 @@ local windows = {
 local navButtons = {}
 local windowStack = {}
 local activeNotifications = {}
-local openModalNames = {}
 local lastEssence = nil
 local essenceNotification = nil
 local essenceStackTotal = 0
@@ -121,43 +121,26 @@ local function setNavInputEnabled(enabled)
 	nav.Active = enabled
 end
 
-local function getModalCount()
-	local count = 0
-	for _ in openModalNames do
-		count += 1
-	end
-	return count
-end
-
-local function updateModalLock()
-	local locked = getModalCount() > 0
+-- Modal registry state now lives in UIBridge (single source of truth for
+-- every script that reports/queries "is a panel open"), this file only
+-- owns the side effects of that state changing.
+UIBridge.Subscribe("ModalLockChanged", function(locked, openNames)
 	setNavInputEnabled(not locked)
-	local allowedOpen = {}
-	for name in openModalNames do
-		table.insert(allowedOpen, name)
-	end
-	Theme.setModalLock(playerGui, locked, allowedOpen)
+	Theme.setModalLock(playerGui, locked, openNames)
 	if _G.DragonIslandSetTutorialSuppressed then
 		_G.DragonIslandSetTutorialSuppressed(locked)
 	end
 	if _G.DragonIslandSetWorldPanelsSuppressed then
 		_G.DragonIslandSetWorldPanelsSuppressed(locked)
 	end
-end
+end)
 
 local function registerModalOpen(guiName)
-	if typeof(guiName) ~= "string" or guiName == "" then
-		return
-	end
-	openModalNames[guiName] = true
-	updateModalLock()
+	UIBridge.NotifyModalOpened(guiName)
 end
 
 local function registerModalClosed(guiName)
-	if typeof(guiName) == "string" then
-		openModalNames[guiName] = nil
-	end
-	updateModalLock()
+	UIBridge.NotifyModalClosed(guiName)
 end
 
 local function setNavHighlights(activeKey)
@@ -538,7 +521,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if closeTopWindow() then
 		return
 	end
-	if getModalCount() > 0 or processed then
+	if UIBridge.IsModalOpen() or processed then
 		Theme.releaseAllInput(playerGui)
 	end
 end)
@@ -594,14 +577,9 @@ end)
 
 _G.DragonIslandNotify = notify
 _G.DragonIslandFormatCompact = formatCompact
-_G.DragonIslandIsModalOpen = function()
-	return getModalCount() > 0
-end
+_G.DragonIslandIsModalOpen = UIBridge.IsModalOpen
 
-_G.DragonIslandResetModalRegistry = function()
-	table.clear(openModalNames)
-	updateModalLock()
-end
+_G.DragonIslandResetModalRegistry = UIBridge.ResetModalRegistry
 
 _G.DragonIslandForceReleaseInput = function()
 	Theme.releaseAllInput(playerGui)
