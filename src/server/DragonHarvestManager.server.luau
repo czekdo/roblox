@@ -14,6 +14,7 @@ local DragonTrainingConfig = require(ReplicatedStorage:WaitForChild("DragonTrain
 local DragonRosterBridge = require(script.Parent:WaitForChild("DragonRosterBridge"))
 local DragonInventoryService = require(script.Parent:WaitForChild("DragonInventoryService"))
 local BiomeResourceRegistry = require(ReplicatedStorage:WaitForChild("BiomeResourceRegistry"))
+local IslandUnlockConfig = require(ReplicatedStorage:WaitForChild("IslandUnlockConfig"))
 local BiomeResourcePlacer = require(ServerScriptService:WaitForChild("BiomeResourcePlacer"))
 local DragonAIController = require(ServerScriptService:WaitForChild("DragonAIController"))
 local DragonAbilityService = require(ServerScriptService:WaitForChild("DragonAbilityService"))
@@ -1333,6 +1334,14 @@ local function createEgg(player, position, eggType, options)
 		sendEggShopUpdate(player, eggInfo.DisplayName .. " is reserved for future dragons")
 		return
 	end
+	if eggInfo.RequiresIsland and not options.rewardGranted then
+		local unlockChecker = BiomeResourceRegistry.IsIslandUnlockedForPlayer
+		if typeof(unlockChecker) == "function" and not unlockChecker(player, eggInfo.RequiresIsland) then
+			local island = IslandUnlockConfig.GetIslandById(eggInfo.RequiresIsland)
+			sendEggShopUpdate(player, "Unlock " .. (island and island.DisplayName or eggInfo.RequiresIsland) .. " first")
+			return
+		end
+	end
 	if not options.rewardGranted and data.essence < eggInfo.Cost then
 		sendEggShopUpdate(player, "Need " .. tostring(eggInfo.Cost) .. " Dragon Essence")
 		return
@@ -1734,7 +1743,9 @@ local function performHarvestHit(player, dragon, node)
 		* getActiveBoostMultiplier(player, "CraftEssenceBoost")
 		* getActiveBoostMultiplier(player, "TutorialEssenceBoost")
 	local harvestBonus = 1 + AscensionBonusService.GetBonus(player, "HarvestMultiplier")
-	harvestAmount = math.max(1, math.floor(harvestAmount * essenceBoost * harvestBonus + 0.5))
+	local islandId = node:GetAttribute("IslandId")
+	local islandMultiplier = islandId and IslandUnlockConfig.GetEssenceMultiplier(islandId) or 1
+	harvestAmount = math.max(1, math.floor(harvestAmount * essenceBoost * harvestBonus * islandMultiplier + 0.5))
 
 	local abilityResult = DragonAbilityService.ProcessHarvestHit(player, dragon, node, {
 		harvestAmount = harvestAmount,
@@ -2707,6 +2718,7 @@ AdminBridge.register("Trading", {
 		end
 		return {
 			dragonType = record.dragonType,
+			displayName = DragonEggConfig.GetDragonDisplayName(record.dragonType),
 			rarity = record.rarity,
 			level = record.level,
 			evolutionLevel = record.evolutionLevel,

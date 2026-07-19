@@ -254,6 +254,7 @@ local function ensureSessionUi()
 		TextSize = 12, Font = Theme.Fonts.Body, Color = Theme.Colors.TextMuted, ZIndex = 9,
 	})
 	myEssenceBox = Instance.new("TextBox")
+	myEssenceBox.Name = "EssenceBox"
 	myEssenceBox.Size = UDim2.fromOffset(90, 26)
 	myEssenceBox.Position = UDim2.fromOffset(80, 30)
 	myEssenceBox.Text = "0"
@@ -273,6 +274,7 @@ local function ensureSessionUi()
 		TextSize = 12, Font = Theme.Fonts.Body, Color = Theme.Colors.TextMuted, ZIndex = 9,
 	})
 	myGemsBox = Instance.new("TextBox")
+	myGemsBox.Name = "GemsBox"
 	myGemsBox.Size = UDim2.fromOffset(90, 26)
 	myGemsBox.Position = UDim2.fromOffset(80, 60)
 	myGemsBox.Text = "0"

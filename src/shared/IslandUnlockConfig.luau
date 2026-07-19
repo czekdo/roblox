@@ -83,6 +83,23 @@ local IslandUnlockConfig = {
 	},
 }
 
+-- Essence-per-hit multiplier for each island's crystal nodes, applied on top of the base
+-- HarvestConfig.EssencePerHit. Keyed by Id, increasing with the island's unlock order so a
+-- later/better island's crystals are meaningfully worth more to harvest.
+IslandUnlockConfig.EssenceMultiplier = {
+	Forest = 1.0,
+	Cold = 1.3,
+	Lava = 1.7,
+	Storm = 2.2,
+	Shadow = 2.8,
+	Crystal = 3.5,
+	Celestial = 4.5,
+}
+
+function IslandUnlockConfig.GetEssenceMultiplier(islandId)
+	return IslandUnlockConfig.EssenceMultiplier[islandId] or 1
+end
+
 function IslandUnlockConfig.GetIslandById(islandId)
 	for _, island in IslandUnlockConfig.Islands do
 		if island.Id == islandId then

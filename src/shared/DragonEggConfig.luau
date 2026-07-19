@@ -51,6 +51,7 @@ DragonEggConfig.EggTypes = {
 		Id = "Forest",
 		DisplayName = "Forest Egg",
 		Cost = 300,
+		RequiresIsland = "Forest",
 		Description = "A moss-covered egg that always hatches a Forest Dragon.",
 		RarityColor = Color3.fromRGB(90, 210, 120),
 		EggColor = Color3.fromRGB(92, 150, 86),
@@ -65,6 +66,7 @@ DragonEggConfig.EggTypes = {
 		Id = "Ice",
 		DisplayName = "Ice Egg",
 		Cost = 1000,
+		RequiresIsland = "Cold",
 		Description = "A frozen egg that always hatches an Ice Dragon.",
 		RarityColor = Color3.fromRGB(120, 220, 255),
 		EggColor = Color3.fromRGB(175, 235, 255),
@@ -80,7 +82,7 @@ DragonEggConfig.EggTypes = {
 		DisplayName = "Fire Egg",
 		ModelFolder = "Lava",
 		Cost = 5000,
-		Description = "A blazing egg that always hatches a Fire Dragon.",
+		Description = "A blazing egg that always hatches a Fire Dragon. Not tied to any island - available as soon as you can afford it.",
 		RarityColor = Color3.fromRGB(255, 110, 70),
 		EggColor = Color3.fromRGB(170, 55, 38),
 		SpotColor = Color3.fromRGB(255, 185, 75),
@@ -90,11 +92,57 @@ DragonEggConfig.EggTypes = {
 			{ Name = "FireDragon", DisplayName = "Fire Dragon", ModelName = "FireDragon", Weight = 1 },
 		},
 	},
+	Lava = {
+		Id = "Lava",
+		DisplayName = "Lava Egg",
+		Cost = 5000,
+		RequiresIsland = "Lava",
+		Description = "A molten egg that always hatches a Lava Dragon.",
+		RarityColor = Color3.fromRGB(255, 90, 40),
+		EggColor = Color3.fromRGB(120, 35, 20),
+		SpotColor = Color3.fromRGB(255, 140, 40),
+		GlowColor = Color3.fromRGB(255, 70, 20),
+		Icon = "rbxassetid://73214946386499",
+		Dragons = {
+			{ Name = "LavaDragon", DisplayName = "Lava Dragon", ModelName = "LavaDragon", Weight = 1 },
+		},
+	},
+	Storm = {
+		Id = "Storm",
+		DisplayName = "Storm Egg",
+		Cost = 15000,
+		RequiresIsland = "Storm",
+		Description = "A crackling egg that always hatches a Storm Dragon.",
+		RarityColor = Color3.fromRGB(170, 130, 255),
+		EggColor = Color3.fromRGB(90, 70, 150),
+		SpotColor = Color3.fromRGB(200, 180, 255),
+		GlowColor = Color3.fromRGB(150, 120, 255),
+		Icon = "rbxassetid://72607541698873",
+		Dragons = {
+			{ Name = "StormDragon", DisplayName = "Storm Dragon", ModelName = "StormDragon", Weight = 1 },
+		},
+	},
+	Shadow = {
+		Id = "Shadow",
+		DisplayName = "Shadow Egg",
+		Cost = 45000,
+		RequiresIsland = "Shadow",
+		Description = "A murky egg that always hatches a Void Dragon.",
+		RarityColor = Color3.fromRGB(120, 95, 170),
+		EggColor = Color3.fromRGB(50, 40, 65),
+		SpotColor = Color3.fromRGB(150, 120, 200),
+		GlowColor = Color3.fromRGB(130, 90, 200),
+		Icon = "rbxassetid://126528254643859",
+		Dragons = {
+			{ Name = "VoidDragon", DisplayName = "Void Dragon", ModelName = "VoidDragon", Weight = 1 },
+		},
+	},
 	Crystal = {
 		Id = "Crystal",
 		DisplayName = "Crystal Egg",
 		ModelFolder = "crysal",
-		Cost = 15000,
+		Cost = 120000,
+		RequiresIsland = "Crystal",
 		Description = "A radiant crystal egg that always hatches a Crystal Dragon.",
 		RarityColor = Color3.fromRGB(190, 120, 255),
 		EggColor = Color3.fromRGB(125, 78, 190),
@@ -103,6 +151,21 @@ DragonEggConfig.EggTypes = {
 		Icon = "rbxassetid://73150429062000",
 		Dragons = {
 			{ Name = "CrystalDragon", DisplayName = "Crystal Dragon", ModelName = "CrystalDragon", Weight = 1 },
+		},
+	},
+	Celestial = {
+		Id = "Celestial",
+		DisplayName = "Celestial Egg",
+		Cost = 600000,
+		RequiresIsland = "Celestial",
+		Description = "A radiant, star-flecked egg that always hatches a Celestial Dragon.",
+		RarityColor = Color3.fromRGB(255, 220, 120),
+		EggColor = Color3.fromRGB(200, 170, 90),
+		SpotColor = Color3.fromRGB(255, 245, 210),
+		GlowColor = Color3.fromRGB(255, 235, 150),
+		Icon = "rbxassetid://112684829478873",
+		Dragons = {
+			{ Name = "CelestialDragon", DisplayName = "Celestial Dragon", ModelName = "CelestialDragon", Weight = 1 },
 		},
 	},
 	Ancient = {
@@ -120,15 +183,51 @@ DragonEggConfig.EggTypes = {
 	},
 }
 
-DragonEggConfig.EggOrder = { "Common", "Forest", "Ice", "Fire", "Crystal", "Ancient" }
-DragonEggConfig.RewardEggOrder = { "Common", "Rare", "Forest", "Ice", "Fire", "Crystal", "Ancient" }
+-- Every purchasable egg (not Rare - tutorial-only, kept predictable; not Ancient - reserved) has a
+-- tiny, uniform chance of hatching one of these secret dragons instead of its normal species pool.
+-- Weight is computed relative to each egg's own normal-dragon weight total, so the resulting percent
+-- chance is the same (~SECRET_DRAGON_CHANCE) on every egg regardless of how many normal species it has.
+local SECRET_DRAGON_CHANCE = 0.005
+local SECRET_DRAGON_EGGS = { "Common", "Forest", "Ice", "Fire", "Lava", "Storm", "Shadow", "Crystal", "Celestial" }
+local SECRET_DRAGONS = {
+	{ Name = "PoisonDragon", DisplayName = "Poison Dragon", ModelName = "PoisonDragon" },
+	{ Name = "CoralOceanDragon", DisplayName = "Coral Ocean Dragon", ModelName = "CoralOceanDragon" },
+}
+
+for _, eggId in SECRET_DRAGON_EGGS do
+	local eggInfo = DragonEggConfig.EggTypes[eggId]
+	local normalWeight = 0
+	for _, dragon in eggInfo.Dragons do
+		normalWeight += dragon.Weight or 1
+	end
+	local secretWeight = normalWeight * SECRET_DRAGON_CHANCE
+	for _, secret in SECRET_DRAGONS do
+		table.insert(eggInfo.Dragons, {
+			Name = secret.Name,
+			DisplayName = secret.DisplayName,
+			ModelName = secret.ModelName,
+			Weight = secretWeight,
+		})
+	end
+end
+
+-- Order matches island unlock progression (Forest, Cold, Lava, Storm, Shadow, Crystal, Celestial),
+-- with Fire (not island-gated) placed right after the first two, and Ancient (reserved) last.
+DragonEggConfig.EggOrder = { "Common", "Forest", "Ice", "Fire", "Lava", "Storm", "Shadow", "Crystal", "Celestial", "Ancient" }
+DragonEggConfig.RewardEggOrder = { "Common", "Rare", "Forest", "Ice", "Fire", "Lava", "Storm", "Shadow", "Crystal", "Celestial", "Ancient" }
 
 DragonEggConfig.EggCost = DragonEggConfig.EggTypes.Common.Cost
 DragonEggConfig.DragonTypes = {
 	"ForestDragon",
-	"FireDragon",
-	"CrystalDragon",
 	"IceDragon",
+	"FireDragon",
+	"LavaDragon",
+	"StormDragon",
+	"VoidDragon",
+	"CrystalDragon",
+	"CelestialDragon",
+	"PoisonDragon",
+	"CoralOceanDragon",
 }
 
 DragonEggConfig.Evolution = {

@@ -58,8 +58,7 @@ local eggShopPreviewIconGlow = nil
 local eggShopPreviewName = nil
 local eggShopPreviewDesc = nil
 local eggShopPreviewCost = nil
-local eggShopPreviewDrops = nil
-local eggShopPreviewStats = nil
+local eggShopPreviewInfoScroll = nil
 local eggShopPurchaseButton = nil
 local eggShopPurchasePriceText = nil
 local eggShopPreviewShowcase = nil
@@ -583,30 +582,93 @@ selectEggShopEgg = function(eggType)
 		eggShopPreviewCost.Text = formatNumber(eggInfo.Cost) .. " Essence"
 	end
 
-	local dragonLines = {}
-	local dragonChances = getEggDragonChances(eggInfo)
-	if #dragonChances == 0 then
-		table.insert(dragonLines, "Future dragon pool")
-	else
-		for _, entry in dragonChances do
-			table.insert(dragonLines, entry.Name .. "  " .. formatChance(entry.Chance))
+	if eggShopPreviewInfoScroll then
+		for _, child in eggShopPreviewInfoScroll:GetChildren() do
+			if child:IsA("GuiObject") then
+				child:Destroy()
+			end
 		end
-	end
-	local rarityLines = {}
-	for _, rarity in DragonEggConfig.GetRarityDropChances() do
-		table.insert(rarityLines, rarity.Name .. " " .. formatChance(rarity.Chance))
-	end
-	if eggShopPreviewDrops then
-		eggShopPreviewDrops.Text = "Possible Dragons:\n" .. table.concat(dragonLines, "\n") .. "\n\nRarity Chances:\n" .. table.concat(rarityLines, "  •  ")
-	end
 
-	local ownedCounts = eggShopState.ownedEggs or {}
-	local stats = eggShopState.eggStats or {}
-	local purchases = stats.Purchases or {}
-	local hatched = stats.Hatched or {}
-	local owned = ownedCounts[eggType] or (stats.OwnedEggs and stats.OwnedEggs[eggType]) or 0
-	if eggShopPreviewStats then
-		eggShopPreviewStats.Text = "Owned: " .. tostring(owned) .. "   Bought: " .. tostring(purchases[eggType] or 0) .. "   Hatched: " .. tostring(hatched[eggType] or 0)
+		eggShopPreviewInfoScroll.CanvasPosition = Vector2.new(0, 0)
+		local order = 0
+		local function addSectionHeader(text)
+			order += 1
+			Theme.createText({
+				Name = "Header" .. order, Parent = eggShopPreviewInfoScroll, Text = text,
+				Size = UDim2.new(1, 0, 0, 16), TextSize = 11, Font = Theme.Fonts.Bold,
+				Color = EGG_SHOP_GOLD, XAlign = Enum.TextXAlignment.Left, ZIndex = 10, LayoutOrder = order,
+			})
+		end
+
+		addSectionHeader("POSSIBLE DRAGONS")
+		local dragonChances = getEggDragonChances(eggInfo)
+		if #dragonChances == 0 then
+			order += 1
+			Theme.createText({
+				Name = "Row" .. order, Parent = eggShopPreviewInfoScroll, Text = "Future dragon pool",
+				Size = UDim2.new(1, 0, 0, 16), TextSize = 12, Font = Theme.Fonts.Regular,
+				Color = Theme.Colors.TextMuted, XAlign = Enum.TextXAlignment.Left, ZIndex = 10, LayoutOrder = order,
+			})
+		else
+			for _, entry in dragonChances do
+				order += 1
+				local row = Theme.createFrame({
+					Name = "Row" .. order, Parent = eggShopPreviewInfoScroll,
+					Size = UDim2.new(1, 0, 0, 16), BgTransparency = 1, ZIndex = 10, LayoutOrder = order,
+				})
+				Theme.createText({
+					Name = "Name", Parent = row, Text = entry.Name,
+					Size = UDim2.new(1, -50, 1, 0), TextSize = 12, Font = Theme.Fonts.Regular,
+					Color = Theme.Colors.Text, XAlign = Enum.TextXAlignment.Left, ZIndex = 10,
+				})
+				Theme.createText({
+					Name = "Chance", Parent = row, Text = formatChance(entry.Chance),
+					Size = UDim2.fromOffset(50, 16), Position = UDim2.new(1, -50, 0, 0),
+					TextSize = 12, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextMuted,
+					XAlign = Enum.TextXAlignment.Right, ZIndex = 10,
+				})
+			end
+		end
+
+		order += 1
+		addSectionHeader("RARITY CHANCES")
+		order += 1
+		local rarityGrid = Theme.createFrame({
+			Name = "RarityGrid", Parent = eggShopPreviewInfoScroll,
+			Size = UDim2.new(1, 0, 0, 50), BgTransparency = 1, ZIndex = 10, LayoutOrder = order,
+		})
+		local gridLayout = Instance.new("UIGridLayout")
+		gridLayout.CellSize = UDim2.fromOffset(88, 20)
+		gridLayout.CellPadding = UDim2.fromOffset(4, 4)
+		gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		gridLayout.Parent = rarityGrid
+		for i, rarity in DragonEggConfig.GetRarityDropChances() do
+			local pillColor = Theme.getRarityColor(rarity.Name)
+			local pill = Theme.createFrame({
+				Name = "Pill" .. i, Parent = rarityGrid, Bg = pillColor, BgTransparency = 0.78,
+				Corner = Theme.Corner.Small, ZIndex = 10, LayoutOrder = i,
+			})
+			Theme.stroke(pill, pillColor, 1, 0.35)
+			Theme.createText({
+				Name = "Label", Parent = pill, Text = rarity.Name .. " " .. formatChance(rarity.Chance),
+				Size = UDim2.new(1, -6, 1, 0), Position = UDim2.fromOffset(3, 0),
+				TextSize = 10, Font = Theme.Fonts.Bold, Color = pillColor,
+				XAlign = Enum.TextXAlignment.Center, ZIndex = 11,
+			})
+		end
+
+		local ownedCounts = eggShopState.ownedEggs or {}
+		local stats = eggShopState.eggStats or {}
+		local purchases = stats.Purchases or {}
+		local hatched = stats.Hatched or {}
+		local owned = ownedCounts[eggType] or (stats.OwnedEggs and stats.OwnedEggs[eggType]) or 0
+		order += 1
+		Theme.createText({
+			Name = "Stats", Parent = eggShopPreviewInfoScroll,
+			Text = "Owned: " .. tostring(owned) .. "   Bought: " .. tostring(purchases[eggType] or 0) .. "   Hatched: " .. tostring(hatched[eggType] or 0),
+			Size = UDim2.new(1, 0, 0, 16), TextSize = 11, Font = Theme.Fonts.Bold,
+			Color = Theme.Colors.GoldBright, XAlign = Enum.TextXAlignment.Center, ZIndex = 10, LayoutOrder = order,
+		})
 	end
 
 	local canBuy = not eggInfo.Reserved and getCurrentEssence() >= eggInfo.Cost
@@ -854,7 +916,7 @@ local function createEggShopUI()
 
 	eggShopPreviewShowcase = Theme.createFrame({
 		Name = "Showcase", Parent = eggShopDetailPanel,
-		Size = UDim2.new(1, 0, 0, 168), Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(1, 0, 0, 100), Position = UDim2.fromOffset(0, 0),
 		Bg = Color3.fromRGB(12, 18, 36), Corner = Theme.Corner.Medium, ClipsDescendants = true, ZIndex = 9,
 	})
 	Theme.stroke(eggShopPreviewShowcase, EGG_SHOP_GOLD_DIM, 1.2, 0.55)
@@ -886,7 +948,7 @@ local function createEggShopUI()
 	})
 	Theme.stroke(pedestal, EGG_SHOP_GOLD_DIM, 1, 0.5)
 
-	local iconFrame, iconImg = Theme.createIconFrame(eggShopPreviewShowcase, Theme.Icons.Egg, 96, 12)
+	local iconFrame, iconImg = Theme.createIconFrame(eggShopPreviewShowcase, Theme.Icons.Egg, 68, 12)
 	iconFrame.Position = UDim2.new(0.5, 0, 0.44, 0)
 	iconFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	iconFrame.BackgroundColor3 = Color3.fromRGB(20, 26, 44)
@@ -904,28 +966,36 @@ local function createEggShopUI()
 
 	eggShopPreviewName = Theme.createText({
 		Name = "PreviewName", Parent = eggShopDetailPanel,
-		Text = "Select an egg", Size = UDim2.new(1, 0, 0, 26),
-		Position = UDim2.fromOffset(0, 176), TextSize = 22, Font = Theme.Fonts.Title,
+		Text = "Select an egg", Size = UDim2.new(1, 0, 0, 22),
+		Position = UDim2.fromOffset(0, 106), TextSize = 19, Font = Theme.Fonts.Title,
 		Color = Theme.Colors.TextLight, XAlign = Enum.TextXAlignment.Center, ZIndex = 10,
 	})
 	eggShopPreviewDesc = Theme.createText({
 		Name = "PreviewDesc", Parent = eggShopDetailPanel,
-		Text = "", Size = UDim2.new(1, 0, 0, 38),
-		Position = UDim2.fromOffset(0, 204), TextSize = 13, Font = Theme.Fonts.Body,
+		Text = "", Size = UDim2.new(1, 0, 0, 32),
+		Position = UDim2.fromOffset(0, 130), TextSize = 12, Font = Theme.Fonts.Body,
 		Color = Theme.Colors.Text, YAlign = Enum.TextYAlignment.Top, XAlign = Enum.TextXAlignment.Center, ZIndex = 10,
 	})
-	eggShopPreviewDrops = Theme.createText({
-		Name = "PreviewDrops", Parent = eggShopDetailPanel,
-		Text = "", Size = UDim2.new(1, 0, 0, 46),
-		Position = UDim2.fromOffset(0, 244), TextSize = 10, Font = Theme.Fonts.Regular,
-		Color = Theme.Colors.TextMuted, YAlign = Enum.TextYAlignment.Top, XAlign = Enum.TextXAlignment.Center, ZIndex = 10,
-	})
-	eggShopPreviewStats = Theme.createText({
-		Name = "PreviewStats", Parent = eggShopDetailPanel,
-		Text = "", Size = UDim2.new(1, 0, 0, 14),
-		Position = UDim2.fromOffset(0, 292), TextSize = 11, Font = Theme.Fonts.Bold,
-		Color = Theme.Colors.GoldBright, XAlign = Enum.TextXAlignment.Center, ZIndex = 10,
-	})
+	-- Scrollable so per-egg content (species list + rarity chances + stats) never gets clipped or
+	-- overlaps the purchase button below it, regardless of how many dragons/lines a given egg has.
+	-- Fixed offset height (not scale-relative) - measured empirically against the purchase button's
+	-- actual position so there's no overlap; see PurchaseButton below (anchored 58px from panel bottom).
+	eggShopPreviewInfoScroll = Instance.new("ScrollingFrame")
+	eggShopPreviewInfoScroll.Name = "PreviewInfoScroll"
+	eggShopPreviewInfoScroll.Size = UDim2.new(1, 0, 0, 100)
+	eggShopPreviewInfoScroll.Position = UDim2.fromOffset(0, 166)
+	eggShopPreviewInfoScroll.BackgroundTransparency = 1
+	eggShopPreviewInfoScroll.BorderSizePixel = 0
+	eggShopPreviewInfoScroll.ScrollBarThickness = 5
+	eggShopPreviewInfoScroll.ScrollBarImageColor3 = EGG_SHOP_GOLD_DIM
+	eggShopPreviewInfoScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	eggShopPreviewInfoScroll.CanvasSize = UDim2.fromOffset(0, 0)
+	eggShopPreviewInfoScroll.ZIndex = 10
+	eggShopPreviewInfoScroll.Parent = eggShopDetailPanel
+	local infoLayout = Instance.new("UIListLayout")
+	infoLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	infoLayout.Padding = UDim.new(0, 8)
+	infoLayout.Parent = eggShopPreviewInfoScroll
 
 	eggShopPurchaseButton = Theme.createButton({
 		Name = "PurchaseButton", Parent = eggShopDetailPanel,
@@ -1554,6 +1624,8 @@ local ABILITY_VFX_COLORS = {
 	Corrosion = Color3.fromRGB(120, 220, 80),
 	MoltenCore = Color3.fromRGB(255, 140, 60),
 	OceanBlessing = Color3.fromRGB(70, 170, 255),
+	VoidRift = Color3.fromRGB(140, 80, 220),
+	Starfall = Color3.fromRGB(255, 230, 150),
 }
 
 local function emitBurst(parent, color, count, size)
@@ -1967,7 +2039,7 @@ local function updateDragonAbilityMeter(dragon, data)
 
 	local text = ""
 	local color = Color3.fromRGB(220, 230, 255)
-	if dragonType == "ThunderDragon" and chainRequired > 0 then
+	if dragonType == "StormDragon" and chainRequired > 0 then
 		text = "Chain " .. tostring(chainHits) .. "/" .. tostring(chainRequired)
 		color = ABILITY_VFX_COLORS.ChainLightning
 	elseif dragonType == "LavaDragon" and heatMax > 0 then

@@ -38,8 +38,14 @@ end
 
 handlers.DragonEssence = function(player, reward, context)
 	local amount = scaledAmount(player, reward, context)
-	local essence = (player:GetAttribute("DragonEssence") or 0) + amount
-	player:SetAttribute("DragonEssence", essence)
+	-- Must go through Harvest's adjustEssence, not a raw SetAttribute: DragonHarvestManager
+	-- treats the DragonEssence attribute as a mirror of its own private essence total and
+	-- overwrites it on every harvest tick, which would silently swallow a direct attribute write.
+	local ok, essence = AdminBridge.call("Harvest", "adjustEssence", player, amount)
+	if not ok then
+		essence = (player:GetAttribute("DragonEssence") or 0) + amount
+		player:SetAttribute("DragonEssence", essence)
+	end
 	if context.NotifyUI then
 		HarvestUIUpdate:FireClient(player, essence)
 	end

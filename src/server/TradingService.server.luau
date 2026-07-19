@@ -42,7 +42,7 @@ local function enrichOffer(owner, offer)
 		if ok and snapshot then
 			table.insert(dragons, {
 				Id = id,
-				DragonType = snapshot.dragonType,
+				DragonType = snapshot.displayName or snapshot.dragonType,
 				Rarity = snapshot.rarity,
 				Level = snapshot.level,
 				EvolutionLevel = snapshot.evolutionLevel,
@@ -137,9 +137,12 @@ local function executeTrade(session)
 		return
 	end
 
-	playerA:SetAttribute("DragonEssence", essenceA - session.OfferA.Essence + session.OfferB.Essence)
+	-- Essence must go through Harvest's adjustEssence (delta-based), not a raw SetAttribute:
+	-- DragonHarvestManager mirrors its own private essence total onto the attribute on every
+	-- harvest tick, which would silently swallow a direct attribute write.
+	AdminBridge.call("Harvest", "adjustEssence", playerA, session.OfferB.Essence - session.OfferA.Essence)
+	AdminBridge.call("Harvest", "adjustEssence", playerB, session.OfferA.Essence - session.OfferB.Essence)
 	playerA:SetAttribute("PremiumGems", gemsA - session.OfferA.Gems + session.OfferB.Gems)
-	playerB:SetAttribute("DragonEssence", essenceB - session.OfferB.Essence + session.OfferA.Essence)
 	playerB:SetAttribute("PremiumGems", gemsB - session.OfferB.Gems + session.OfferA.Gems)
 
 	for _, entry in snapshotsA do

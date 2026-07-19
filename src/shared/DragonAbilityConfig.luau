@@ -36,7 +36,7 @@ DragonAbilityConfig.Species = {
 			{ CritBonusPercent = 0.16 },
 		},
 	},
-	ThunderDragon = {
+	StormDragon = {
 		AbilityName = "Chain Lightning",
 		Description = "Every few hits, lightning echoes and pays bonus essence.",
 		HandlerId = "ChainLightning",
@@ -46,6 +46,30 @@ DragonAbilityConfig.Species = {
 			{ HitsPerChain = 4, ChainEssencePercent = 0.38 },
 			{ HitsPerChain = 4, ChainEssencePercent = 0.42 },
 			{ HitsPerChain = 3, ChainEssencePercent = 0.33 },
+		},
+	},
+	VoidDragon = {
+		AbilityName = "Void Rift",
+		Description = "Each harvest has a chance to tear open a rift for bonus essence.",
+		HandlerId = "VoidRift",
+		Levels = {
+			{ ProcChance = 0.05, RiftPercent = 0.55 },
+			{ ProcChance = 0.06, RiftPercent = 0.62 },
+			{ ProcChance = 0.07, RiftPercent = 0.70 },
+			{ ProcChance = 0.08, RiftPercent = 0.78 },
+			{ ProcChance = 0.09, RiftPercent = 0.95 },
+		},
+	},
+	CelestialDragon = {
+		AbilityName = "Starfall Blessing",
+		Description = "Each harvest has a chance to call down a star for a big essence bonus.",
+		HandlerId = "Starfall",
+		Levels = {
+			{ ProcChance = 0.04, StarfallPercent = 0.70 },
+			{ ProcChance = 0.05, StarfallPercent = 0.80 },
+			{ ProcChance = 0.06, StarfallPercent = 0.90 },
+			{ ProcChance = 0.07, StarfallPercent = 1.05 },
+			{ ProcChance = 0.08, StarfallPercent = 1.25 },
 		},
 	},
 	ForestDragon = {
@@ -218,6 +242,10 @@ function DragonAbilityConfig.FormatAbilityValue(speciesId, abilityLevel)
 		return "Up to +" .. formatPercent((params.MaxHeat or 1) * (params.HeatEssencePercent or 0)) .. " heat essence"
 	elseif handlerId == "OceanBlessing" then
 		return "Full tide surge: +" .. formatPercent(params.SurgeEssencePercent) .. " essence"
+	elseif handlerId == "VoidRift" then
+		return formatPercent(params.ProcChance) .. " chance for +" .. formatPercent(params.RiftPercent) .. " essence"
+	elseif handlerId == "Starfall" then
+		return formatPercent(params.ProcChance) .. " chance for +" .. formatPercent(params.StarfallPercent) .. " essence"
 	end
 	return config.AbilityName
 end
