@@ -45,6 +45,10 @@ local function getOrCreateSound(zone)
 	return sound
 end
 
+local function getMusicVolumeMultiplier()
+	return player:GetAttribute("MusicVolume") or 1
+end
+
 local function fadeSound(sound, targetVolume)
 	if not sound then
 		return
@@ -79,7 +83,7 @@ local function playZoneMusic(zone)
 	if not activeSound.IsPlaying then
 		activeSound:Play()
 	end
-	fadeSound(activeSound, TRACKS[zone].Volume)
+	fadeSound(activeSound, TRACKS[zone].Volume * getMusicVolumeMultiplier())
 end
 
 local function onZoneChanged()
@@ -89,3 +93,11 @@ end
 
 player:GetAttributeChangedSignal("CurrentZone"):Connect(onZoneChanged)
 task.defer(onZoneChanged)
+
+-- Live-adjusts the currently playing track when the player drags the Music Volume
+-- slider, instead of only picking up the new multiplier on the next zone change.
+player:GetAttributeChangedSignal("MusicVolume"):Connect(function()
+	if activeSound and activeZone and TRACKS[activeZone] then
+		activeSound.Volume = TRACKS[activeZone].Volume * getMusicVolumeMultiplier()
+	end
+end)

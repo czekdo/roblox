@@ -643,6 +643,135 @@ function Theme.createProgressBar(parent, size, position, color)
 	return back, fill
 end
 
+-- Draggable horizontal slider (0-1). props: Parent, Size, Position, LayoutOrder, ZIndex,
+-- Label (text shown above the track), Value (initial 0-1), Color (fill color),
+-- OnChanged(value) fires continuously while dragging (for live local preview),
+-- OnCommit(value) fires once when the drag ends (for persisting to the server).
+-- Returns the container Frame and an api table with SetValue/GetValue.
+function Theme.createSlider(props)
+	local z = props.ZIndex or 1
+	local container = Theme.createFrame({
+		Name = props.Name or "Slider", Parent = props.Parent,
+		Size = props.Size or UDim2.new(1, 0, 0, 56), Position = props.Position,
+		BgTransparency = 1, ZIndex = z, LayoutOrder = props.LayoutOrder,
+	})
+
+	Theme.createText({
+		Name = "Label", Parent = container, Text = props.Label or "",
+		Size = UDim2.new(0.6, 0, 0, 18), Position = UDim2.fromOffset(0, 0),
+		TextSize = 13, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextLight, ZIndex = z + 1,
+	})
+
+	local startValue = math.clamp(props.Value or 1, 0, 1)
+	local valueLabel = Theme.createText({
+		Name = "Value", Parent = container, Text = string.format("%d%%", math.floor(startValue * 100 + 0.5)),
+		Size = UDim2.new(0.4, 0, 0, 18), Position = UDim2.new(0.6, 0, 0, 0),
+		TextSize = 13, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextGold,
+		XAlign = Enum.TextXAlignment.Right, ZIndex = z + 1,
+	})
+
+	-- HitArea is taller than the visual Track (10px) so the drag target is comfortable on
+	-- touch/mouse, matching the Handle's own footprint. It's transparent and only exists for
+	-- input; percentage math always uses Track's own AbsolutePosition/AbsoluteSize.
+	local hitArea = Theme.createFrame({
+		Name = "HitArea", Parent = container, Size = UDim2.new(1, 0, 0, 28), Position = UDim2.fromOffset(0, 21),
+		BgTransparency = 1, ZIndex = z + 1,
+	})
+	hitArea.Active = true
+
+	local track = Theme.createFrame({
+		Name = "Track", Parent = container, Size = UDim2.new(1, 0, 0, 10), Position = UDim2.fromOffset(0, 30),
+		Bg = Theme.Colors.StoneDeep, Corner = Theme.Corner.Pill, ZIndex = z + 1,
+	})
+	track.Active = true
+	Theme.stroke(track, Theme.Colors.Gold, 1, 0.6)
+
+	local fill = Theme.createFrame({
+		Name = "Fill", Parent = track, Size = UDim2.fromScale(startValue, 1),
+		Bg = props.Color or Theme.Colors.Crystal, Corner = Theme.Corner.Pill, ZIndex = z + 2,
+	})
+
+	local handle = Instance.new("Frame")
+	handle.Name = "Handle"
+	handle.Size = UDim2.fromOffset(18, 18)
+	handle.AnchorPoint = Vector2.new(0.5, 0.5)
+	handle.Position = UDim2.new(startValue, 0, 0.5, 0)
+	handle.BackgroundColor3 = Theme.Colors.GoldBright
+	handle.BorderSizePixel = 0
+	handle.Active = true
+	handle.ZIndex = z + 3
+	handle.Parent = track
+	Theme.corner(handle, Theme.Corner.Pill)
+	Theme.stroke(handle, Theme.Colors.TextLight, 1.5, 0.2)
+
+	local dragging = false
+
+	local function setValue(value, fireChanged)
+		value = math.clamp(value, 0, 1)
+		fill.Size = UDim2.fromScale(value, 1)
+		handle.Position = UDim2.new(value, 0, 0.5, 0)
+		valueLabel.Text = string.format("%d%%", math.floor(value * 100 + 0.5))
+		if fireChanged and props.OnChanged then
+			props.OnChanged(value)
+		end
+		return value
+	end
+
+	local function updateFromInput(input)
+		local relativeX = (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
+		setValue(relativeX, true)
+	end
+
+	local function beginDrag(input)
+		dragging = true
+		updateFromInput(input)
+	end
+
+	hitArea.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			beginDrag(input)
+		end
+	end)
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			beginDrag(input)
+		end
+	end)
+	handle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			updateFromInput(input)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if not dragging then
+			return
+		end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+			if props.OnCommit then
+				props.OnCommit(fill.Size.X.Scale)
+			end
+		end
+	end)
+
+	local api = {}
+	function api.SetValue(value)
+		setValue(value, false)
+	end
+	function api.GetValue()
+		return fill.Size.X.Scale
+	end
+
+	return container, api
+end
+
 function Theme.createResourcePill(parent, icon, valueLabel, layoutOrder)
 	local pill = Theme.createFrame({
 		Name = valueLabel .. "Pill", Parent = parent,

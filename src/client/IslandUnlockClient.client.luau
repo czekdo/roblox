@@ -39,7 +39,7 @@ local function playUnlockEffects(position)
 
 	local sound = Instance.new("Sound")
 	sound.SoundId = "rbxassetid://12221967"
-	sound.Volume = 0.65
+	sound.Volume = 0.65 * (player:GetAttribute("SFXVolume") or 1)
 	sound.Parent = attachPart
 	sound:Play()
 	task.delay(2, function()

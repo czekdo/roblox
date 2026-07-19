@@ -14,6 +14,8 @@ local EggShopUpdate = HarvestEvents:WaitForChild("EggShopUpdate")
 local DragonMergeUpdate = HarvestEvents:WaitForChild("DragonMergeUpdate")
 local QuestEvents = ReplicatedStorage:WaitForChild("QuestEvents")
 local QuestUpdate = QuestEvents:WaitForChild("QuestUpdate")
+local SettingsEvents = ReplicatedStorage:WaitForChild("SettingsEvents")
+local SetPlayerSetting = SettingsEvents:WaitForChild("SetPlayerSetting")
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DragonUIUXController"
@@ -360,6 +362,7 @@ local extrasGui
 local extrasPanel
 local extrasTitle
 local extrasBody
+local extrasSliders
 local extrasActions
 
 local function closeExtrasPanel()
@@ -383,6 +386,7 @@ local function ensureExtrasGui()
 	extrasGui.ResetOnSpawn = false
 	extrasGui.DisplayOrder = 40
 	extrasGui.Enabled = false
+	extrasGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	extrasGui.Parent = playerGui
 	Theme.applyScreenSafeArea(extrasGui)
 	local dim = Theme.createDim(extrasGui, 1)
@@ -404,6 +408,14 @@ local function ensureExtrasGui()
 		Position = UDim2.fromOffset(16, 72), TextSize = 15, Font = Theme.Fonts.Body,
 		Color = Theme.Colors.TextMuted, YAlign = Enum.TextYAlignment.Top, ZIndex = 8,
 	})
+	extrasSliders = Theme.createFrame({
+		Name = "Sliders", Parent = extrasPanel, Size = UDim2.new(1, -32, 0, 122),
+		Position = UDim2.fromOffset(16, 170), BgTransparency = 1, ZIndex = 8, Visible = false,
+	})
+	local sliderLayout = Instance.new("UIListLayout")
+	sliderLayout.Padding = UDim.new(0, 10)
+	sliderLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	sliderLayout.Parent = extrasSliders
 	extrasActions = Theme.createFrame({
 		Name = "Actions", Parent = extrasPanel,
 		Size = UDim2.new(1, -32, 0, 120), Position = UDim2.fromOffset(16, 220),
@@ -415,9 +427,14 @@ local function ensureExtrasGui()
 	actionLayout.Parent = extrasActions
 end
 
-local function openExtrasPanel(title, body, actions)
+local function openExtrasPanel(title, body, actions, sliders)
 	ensureExtrasGui()
 	for _, child in extrasActions:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	for _, child in extrasSliders:GetChildren() do
 		if child:IsA("GuiObject") then
 			child:Destroy()
 		end
@@ -425,6 +442,25 @@ local function openExtrasPanel(title, body, actions)
 	local dim = extrasGui:FindFirstChild("DimBackground")
 	extrasTitle.Text = title
 	extrasBody.Text = body
+
+	local hasSliders = typeof(sliders) == "table" and #sliders > 0
+	extrasSliders.Visible = hasSliders
+	if hasSliders then
+		for index, sliderDef in sliders do
+			Theme.createSlider({
+				Parent = extrasSliders,
+				Name = sliderDef.Name,
+				Label = sliderDef.Label,
+				Value = sliderDef.Value,
+				LayoutOrder = index,
+				ZIndex = 9,
+				OnChanged = sliderDef.OnChanged,
+				OnCommit = sliderDef.OnCommit,
+			})
+		end
+	end
+	extrasActions.Position = hasSliders and UDim2.fromOffset(16, 302) or UDim2.fromOffset(16, 220)
+
 	if typeof(actions) == "table" then
 		for index, action in actions do
 			Theme.createButton({
@@ -453,7 +489,17 @@ local function openExtrasPanel(title, body, actions)
 	Theme.tweenOpen(extrasPanel, dim)
 end
 
+local function applyAndCommitSetting(settingName)
+	return function(value)
+		player:SetAttribute(settingName, value)
+	end, function(value)
+		SetPlayerSetting:FireServer(settingName, value)
+	end
+end
+
 _G.DragonIslandOpenSettings = function()
+	local onMusicChanged, onMusicCommit = applyAndCommitSetting("MusicVolume")
+	local onSfxChanged, onSfxCommit = applyAndCommitSetting("SFXVolume")
 	openExtrasPanel(
 		"Settings",
 		"Gameplay helpers and preferences. Lost the tutorial guide? Use the \"Resume Tutorial\" chip in the corner of the screen instead of restarting.",
@@ -485,6 +531,22 @@ _G.DragonIslandOpenSettings = function()
 						}
 					)
 				end,
+			},
+		},
+		{
+			{
+				Name = "MusicVolumeSlider",
+				Label = "Music Volume",
+				Value = player:GetAttribute("MusicVolume") or 1,
+				OnChanged = onMusicChanged,
+				OnCommit = onMusicCommit,
+			},
+			{
+				Name = "SFXVolumeSlider",
+				Label = "SFX Volume",
+				Value = player:GetAttribute("SFXVolume") or 1,
+				OnChanged = onSfxChanged,
+				OnCommit = onSfxCommit,
 			},
 		}
 	)

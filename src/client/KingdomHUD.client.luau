@@ -160,6 +160,12 @@ Theme.createIconButton({
 	Stroke = true, StrokeColor = Theme.Colors.Gold, StrokeTransparency = 0.2,
 	OnClick = function() if _G.DragonIslandOpenDailyReward then _G.DragonIslandOpenDailyReward() end end,
 })
+Theme.createIconButton({
+	Name = "DailyWheelButton", Parent = rightWrap, Size = UDim2.fromOffset(44, 44),
+	Bg = Theme.Colors.TopBarCapsule, Image = Theme.Icons.Trophy, LayoutOrder = 5,
+	Stroke = true, StrokeColor = Theme.Colors.Gold, StrokeTransparency = 0.2,
+	OnClick = function() if _G.DragonIslandOpenDailyWheel then _G.DragonIslandOpenDailyWheel() end end,
+})
 
 local function refreshKingdomStatus()
 	kingdomNameLabel.Text = string.upper(getKingdomName())

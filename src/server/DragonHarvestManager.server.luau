@@ -1838,7 +1838,9 @@ local function updateDragon(player, dragon, dt)
 		dragon.model:SetAttribute("TargetLookPosition", targetPos)
 		local lookAt = CFrame.lookAt(dragon.position, Vector3.new(targetPos.X, dragon.position.Y, targetPos.Z))
 		dragon.model:SetAttribute("LookDirection", lookAt.LookVector)
-		if dragon.harvestTimer >= getDragonHarvestRate(dragon.level, dragon.rarity, dragon.evolutionLevel) / getActiveBoostMultiplier(player, "CraftHarvestBoost") then
+		local harvestSpeedBoost = getActiveBoostMultiplier(player, "CraftHarvestBoost")
+			* getActiveBoostMultiplier(player, "DailyWheelHarvestBoost")
+		if dragon.harvestTimer >= getDragonHarvestRate(dragon.level, dragon.rarity, dragon.evolutionLevel) / harvestSpeedBoost then
 			dragon.harvestTimer = 0
 			performHarvestHit(player, dragon, node)
 			if dragon.state == "harvesting" and (node:GetAttribute("Health") or 0) > 0 then

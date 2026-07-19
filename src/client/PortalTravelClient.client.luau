@@ -101,7 +101,7 @@ local function playArrivalBurst()
 
 	local sound = Instance.new("Sound")
 	sound.SoundId = isStarfall and "rbxassetid://12221990" or "rbxassetid://12221967"
-	sound.Volume = 0.55
+	sound.Volume = 0.55 * (player:GetAttribute("SFXVolume") or 1)
 	sound.Parent = root
 	sound:Play()
 	task.delay(2, function()

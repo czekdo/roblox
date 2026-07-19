@@ -16,7 +16,7 @@ local activeTween
 local function playLevelUpSound()
 	local sound = Instance.new("Sound")
 	sound.SoundId = "rbxassetid://9125402735"
-	sound.Volume = 0.55
+	sound.Volume = 0.55 * (player:GetAttribute("SFXVolume") or 1)
 	sound.Parent = SoundService
 	sound:Play()
 	sound.Ended:Connect(function()

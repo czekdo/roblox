@@ -556,7 +556,7 @@ function TutorialUI:playSound(soundId, volume)
 	end
 	local sound = Instance.new("Sound")
 	sound.SoundId = soundId
-	sound.Volume = volume or 0.5
+	sound.Volume = (volume or 0.5) * (player:GetAttribute("SFXVolume") or 1)
 	sound.Parent = root
 	sound:Play()
 	task.delay(2, function()

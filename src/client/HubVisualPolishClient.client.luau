@@ -159,7 +159,7 @@ local function playCelebrationAt(buildingName)
 
 	local sound = Instance.new("Sound")
 	sound.SoundId = "rbxassetid://12221967"
-	sound.Volume = 0.45
+	sound.Volume = 0.45 * (player:GetAttribute("SFXVolume") or 1)
 	sound.Parent = burstPart
 	sound:Play()
 
@@ -270,7 +270,7 @@ local function playPortalEnterBurst()
 
 	local hum = Instance.new("Sound")
 	hum.SoundId = "rbxassetid://12222216"
-	hum.Volume = 0.35
+	hum.Volume = 0.35 * (player:GetAttribute("SFXVolume") or 1)
 	hum.Parent = root
 	hum:Play()
 
