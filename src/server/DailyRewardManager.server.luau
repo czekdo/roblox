@@ -10,6 +10,7 @@ local DailyRewardEvents = ReplicatedStorage:WaitForChild("DailyRewardEvents")
 local RequestDailyRewardState = DailyRewardEvents:WaitForChild("RequestDailyRewardState")
 local ClaimDailyReward = DailyRewardEvents:WaitForChild("ClaimDailyReward")
 local DailyRewardResult = DailyRewardEvents:WaitForChild("DailyRewardResult")
+local QuestProgressSignal = ReplicatedStorage:WaitForChild("QuestEvents"):WaitForChild("QuestProgressSignal")
 
 local DAILY_REWARD_DATASTORE = "DragonIslandDailyRewardV1"
 local SECONDS_PER_DAY = 86400
@@ -121,6 +122,7 @@ ClaimDailyReward.OnServerEvent:Connect(function(player)
 	data.Streak = newStreak
 	data.LastClaimDayKey = today
 	saveDataNow(player)
+	QuestProgressSignal:Fire(player, "ClaimDailyReward", 1)
 
 	DailyRewardResult:FireClient(player, {
 		success = true,

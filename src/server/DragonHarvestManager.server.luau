@@ -2535,6 +2535,19 @@ local function spawnAdminResourceNodes(player, resourceId, amount)
 end
 
 AdminBridge.register("Harvest", {
+	-- The DragonEssence attribute is a MIRROR of this script's private data.essence (see
+	-- sendUIUpdate, which overwrites the attribute from data.essence on every harvest tick/UI
+	-- refresh). Any code that sets the attribute directly - RewardService's DragonEssence handler,
+	-- TradingService's currency swap - risks having that change silently wiped by the next tick.
+	-- This is the one safe way for outside systems to adjust essence: it updates data.essence
+	-- (the real source of truth) and the attribute together.
+	adjustEssence = function(player, delta)
+		local data = getPlayerData(player)
+		data.essence = math.max(0, data.essence + (tonumber(delta) or 0))
+		player:SetAttribute("DragonEssence", data.essence)
+		sendUIUpdate(player)
+		return data.essence
+	end,
 	giveEgg = function(player, eggType)
 		local position = getEggSpawnPosition(player) or getAdminSpawnPosition(player)
 		createEgg(player, position, eggType, { rewardGranted = true })
@@ -2651,5 +2664,77 @@ AdminBridge.register("Harvest", {
 		data.essence = 0
 		sendUIUpdate(player)
 		return "Harvest runtime wiped"
+	end,
+})
+
+-- Cross-player dragon transfer support for TradingService.server.luau. Scoped to STORAGE dragons
+-- only (isEquipped ~= true): those exist purely as records in ownedDragonById with no live Model,
+-- so a transfer is just removing the record from one player's table and creating an equivalent one
+-- (via AddOwnedDragon, which preserves exact stats) in the other's - no Workspace/Model handling,
+-- no despawn logic needed. Equipped dragons are intentionally not tradeable in this first version.
+AdminBridge.register("Trading", {
+	listStorageDragons = function(player)
+		local data = getPlayerData(player)
+		local list = {}
+		for _, record in data.ownedDragonById do
+			if not record.isEquipped then
+				table.insert(list, {
+					id = record.id,
+					dragonType = record.dragonType,
+					displayName = DragonEggConfig.GetDragonDisplayName(record.dragonType),
+					rarity = record.rarity,
+					level = record.level,
+					evolutionLevel = record.evolutionLevel,
+				})
+			end
+		end
+		table.sort(list, function(a, b)
+			return a.id < b.id
+		end)
+		return list
+	end,
+	canReceiveDragonCount = function(player, count)
+		local data = getPlayerData(player)
+		local capacity = DragonInventoryService.GetStorageCapacity(player)
+		local current = DragonInventoryService.GetOwnedCount(data)
+		return current + (tonumber(count) or 1) <= capacity
+	end,
+	getStorageDragonSnapshot = function(player, dragonId)
+		local data = getPlayerData(player)
+		local record = DragonInventoryService.GetOwnedRecord(data, dragonId)
+		if not record or record.isEquipped then
+			return nil
+		end
+		return {
+			dragonType = record.dragonType,
+			rarity = record.rarity,
+			level = record.level,
+			evolutionLevel = record.evolutionLevel,
+		}
+	end,
+	removeStorageDragon = function(player, dragonId)
+		local data = getPlayerData(player)
+		local record = DragonInventoryService.GetOwnedRecord(data, dragonId)
+		if not record or record.isEquipped then
+			return false
+		end
+		data.ownedDragonById[record.id] = nil
+		data.ownedDragonCount = math.max(0, (data.ownedDragonCount or 1) - 1)
+		saveDragonLevels(player)
+		sendUIUpdate(player)
+		return true
+	end,
+	grantStorageDragon = function(player, snapshot)
+		snapshot = typeof(snapshot) == "table" and snapshot or {}
+		local data = getPlayerData(player)
+		DragonInventoryService.AddOwnedDragon(data, {
+			dragonType = snapshot.dragonType,
+			rarity = snapshot.rarity,
+			level = snapshot.level,
+			evolutionLevel = snapshot.evolutionLevel,
+		})
+		saveDragonLevels(player)
+		sendUIUpdate(player)
+		return true
 	end,
 })

@@ -10,6 +10,7 @@ local WheelEvents = ReplicatedStorage:WaitForChild("WheelEvents")
 local RequestWheelState = WheelEvents:WaitForChild("RequestWheelState")
 local RequestSpin = WheelEvents:WaitForChild("RequestSpin")
 local WheelSpinResult = WheelEvents:WaitForChild("WheelSpinResult")
+local QuestProgressSignal = ReplicatedStorage:WaitForChild("QuestEvents"):WaitForChild("QuestProgressSignal")
 
 local WHEEL_DATASTORE = "DragonIslandDailyWheelV1"
 local SECONDS_PER_DAY = 86400
@@ -106,6 +107,7 @@ RequestSpin.OnServerEvent:Connect(function(player)
 
 	data.LastSpinDayKey = getDayKey()
 	saveDataNow(player)
+	QuestProgressSignal:Fire(player, "SpinDailyWheel", 1)
 
 	WheelSpinResult:FireClient(player, {
 		success = true,

@@ -8,6 +8,7 @@ local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
 local MailEvents = ReplicatedStorage:WaitForChild("MailEvents")
 local RequestMailList = MailEvents:WaitForChild("RequestMailList")
 local ClaimMail = MailEvents:WaitForChild("ClaimMail")
+local QuestProgressSignal = ReplicatedStorage:WaitForChild("QuestEvents"):WaitForChild("QuestProgressSignal")
 
 local MAIL_DATASTORE = "DragonIslandMailV1"
 
@@ -113,6 +114,7 @@ ClaimMail.OnServerEvent:Connect(function(player, mailId)
 				RewardService.Grant(player, entry.Reward, { Source = "Mail" })
 			end
 			saveDataNow(player)
+			QuestProgressSignal:Fire(player, "ClaimMail", 1)
 			return
 		end
 	end

@@ -9,6 +9,7 @@ local CraftEvents = ReplicatedStorage:WaitForChild("CraftEvents")
 local RequestCraftData = CraftEvents:WaitForChild("RequestCraftData")
 local CraftItem = CraftEvents:WaitForChild("CraftItem")
 local CraftStateUpdated = CraftEvents:WaitForChild("CraftStateUpdated")
+local QuestProgressSignal = ReplicatedStorage:WaitForChild("QuestEvents"):WaitForChild("QuestProgressSignal")
 
 local function getWorkshopTier(player)
 	local island = WorkspaceLayout.GetPlayerIsland(player)
@@ -78,6 +79,7 @@ CraftItem.OnServerEvent:Connect(function(player, recipeId)
 
 	player:SetAttribute("DragonEssence", essence - recipe.Cost)
 	applyReward(player, recipe.Reward)
+	QuestProgressSignal:Fire(player, "CraftItem", 1)
 	sendState(player, "Crafted " .. recipe.DisplayName)
 end)
 

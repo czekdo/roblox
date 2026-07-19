@@ -79,11 +79,62 @@ local QUEST_DEFINITIONS = {
 		Target = 1,
 		Reward = { Type = "DragonEssence", Amount = 150, Text = "+150 Dragon Essence" },
 	},
+	{
+		Id = "SpinDailyWheel",
+		Title = "Spin the Daily Wheel",
+		Description = "Spin the Daily Wheel once.",
+		Target = 1,
+		Reward = { Type = "DragonEssence", Amount = 100, Text = "+100 Dragon Essence" },
+	},
+	{
+		Id = "ClaimDailyReward",
+		Title = "Claim Your Daily Reward",
+		Description = "Claim your Daily Reward once.",
+		Target = 1,
+		Reward = { Type = "DragonEssence", Amount = 100, Text = "+100 Dragon Essence" },
+	},
+	{
+		Id = "ClaimMail",
+		Title = "Check Your Mail",
+		Description = "Claim a mail reward once.",
+		Target = 1,
+		Reward = { Type = "DragonEssence", Amount = 80, Text = "+80 Dragon Essence" },
+	},
+	{
+		Id = "CraftItem",
+		Title = "Craft at the Workshop",
+		Description = "Craft 1 item at the Workshop.",
+		Target = 1,
+		Reward = { Type = "DragonEssence", Amount = 150, Text = "+150 Dragon Essence" },
+	},
 }
+
+-- How many of the pool above are offered per day; see selectDailyQuests.
+local QUESTS_PER_DAY = 5
 
 local questById = {}
 for _, quest in QUEST_DEFINITIONS do
 	questById[quest.Id] = quest
+end
+
+-- Deterministic per-player-per-day pick, so re-opening the quest panel (or rejoining) the same
+-- day shows the same 5 quests without needing to persist the selection separately.
+local function selectDailyQuests(player, dayKey)
+	local y, m, d = dayKey:match("(%d+)-(%d+)-(%d+)")
+	local dayNumber = (tonumber(y) or 0) * 372 + (tonumber(m) or 0) * 31 + (tonumber(d) or 0)
+	local rng = Random.new(player.UserId + dayNumber)
+
+	local pool = table.clone(QUEST_DEFINITIONS)
+	for i = #pool, 2, -1 do
+		local j = rng:NextInteger(1, i)
+		pool[i], pool[j] = pool[j], pool[i]
+	end
+
+	local selected = {}
+	for i = 1, math.min(QUESTS_PER_DAY, #pool) do
+		table.insert(selected, pool[i])
+	end
+	return selected
 end
 
 local playerQuestData = {}
@@ -95,9 +146,9 @@ local function getDayKey()
 	return os.date("!%Y-%m-%d")
 end
 
-local function createDefaultProgress()
+local function createDefaultProgress(selectedQuests)
 	local progress = {}
-	for _, quest in QUEST_DEFINITIONS do
+	for _, quest in selectedQuests do
 		progress[quest.Id] = {
 			Progress = 0,
 			Claimed = false,
@@ -106,8 +157,8 @@ local function createDefaultProgress()
 	return progress
 end
 
-local function normalizeProgress(progress)
-	local normalized = createDefaultProgress()
+local function normalizeProgress(selectedQuests, progress)
+	local normalized = createDefaultProgress(selectedQuests)
 	if typeof(progress) == "table" then
 		for questId, questProgress in progress do
 			if normalized[questId] and typeof(questProgress) == "table" then
@@ -121,7 +172,7 @@ end
 
 local function serializeForClient(data)
 	local quests = {}
-	for _, quest in QUEST_DEFINITIONS do
+	for _, quest in data.SelectedQuests do
 		local progress = data.Progress[quest.Id]
 		table.insert(quests, {
 			Id = quest.Id,
@@ -231,9 +282,11 @@ end
 
 local function loadQuestData(player)
 	local dayKey = getDayKey()
+	local selectedQuests = selectDailyQuests(player, dayKey)
 	local data = {
 		DayKey = dayKey,
-		Progress = createDefaultProgress(),
+		SelectedQuests = selectedQuests,
+		Progress = createDefaultProgress(selectedQuests),
 		QuestEggs = 0,
 		ActiveBoosts = {},
 		ReadyAt = os.clock() + 7,
@@ -244,7 +297,7 @@ local function loadQuestData(player)
 			return questStore:GetAsync(tostring(player.UserId))
 		end)
 		if success and typeof(result) == "table" and result.DayKey == dayKey then
-			data.Progress = normalizeProgress(result.Progress)
+			data.Progress = normalizeProgress(selectedQuests, result.Progress)
 			data.QuestEggs = math.max(0, tonumber(result.QuestEggs) or 0)
 			data.ActiveBoosts = typeof(result.ActiveBoosts) == "table" and result.ActiveBoosts or {}
 		elseif not success then
@@ -401,7 +454,7 @@ AdminBridge.register("Quests", {
 		if not data then
 			return "Quest data not loaded"
 		end
-		for _, quest in QUEST_DEFINITIONS do
+		for _, quest in data.SelectedQuests do
 			local progress = data.Progress[quest.Id]
 			if progress then
 				progress.Progress = quest.Target
@@ -420,9 +473,12 @@ AdminBridge.register("Quests", {
 		return "Quest progress saved"
 	end,
 	wipe = function(player)
+		local dayKey = getDayKey()
+		local selectedQuests = selectDailyQuests(player, dayKey)
 		local data = {
-			DayKey = getDayKey(),
-			Progress = createDefaultProgress(),
+			DayKey = dayKey,
+			SelectedQuests = selectedQuests,
+			Progress = createDefaultProgress(selectedQuests),
 			QuestEggs = 0,
 			ActiveBoosts = {},
 			ReadyAt = 0,

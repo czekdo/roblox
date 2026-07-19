@@ -2,6 +2,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AscensionBonusService = require(ServerScriptService:WaitForChild("AscensionBonusService"))
+local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 
 local TutorialEvents = ReplicatedStorage:WaitForChild("TutorialEvents")
 local GrantTutorialRewardEgg = TutorialEvents:WaitForChild("GrantTutorialRewardEgg")

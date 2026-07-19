@@ -7,6 +7,8 @@ local HarvestConfig = require(ReplicatedStorage:WaitForChild("HarvestConfig"))
 local DragonAbilityConfig = require(ReplicatedStorage:WaitForChild("DragonAbilityConfig"))
 local DragonEggConfig = require(ReplicatedStorage:WaitForChild("DragonEggConfig"))
 local DragonInventoryConfig = require(ReplicatedStorage:WaitForChild("DragonInventoryConfig"))
+local LeaderboardConfig = require(ReplicatedStorage:WaitForChild("LeaderboardConfig"))
+local RequestLeaderboard = ReplicatedStorage:WaitForChild("LeaderboardEvents"):WaitForChild("RequestLeaderboard")
 local InventoryEvents = ReplicatedStorage:WaitForChild("InventoryEvents")
 local RequestInventoryData = InventoryEvents:WaitForChild("RequestInventoryData")
 local UseInventoryItem = InventoryEvents:WaitForChild("UseInventoryItem")
@@ -1035,16 +1037,105 @@ local function renderInventoryTab()
 	renderInventoryDetail(detailPanel, getInventoryItemById(selectedItemId))
 end
 
+local selectedLeaderboardCategory = LeaderboardConfig.Categories[1].Key
+
 local function renderLeaderboardsTab()
 	clearContent()
-	setHeader("LEADERBOARDS", "Kingdom rankings and dragon power")
-	Theme.createEmptyState(
-		contentFrame,
-		Theme.Icons.Trophy,
-		"Leaderboards Coming Soon",
-		"Top players ranked by Kingdom Level, Lifetime Dragon Essence, and Dragon Power.",
-		8
-	)
+	setHeader("LEADERBOARDS", "Top players in the kingdom")
+
+	local categoryBar = Theme.createFrame({
+		Name = "CategoryBar", Parent = contentFrame,
+		Size = UDim2.new(1, -12, 0, 40), Position = UDim2.fromOffset(6, 6),
+		Bg = Color3.new(0, 0, 0), BgTransparency = 1, ZIndex = 8,
+	})
+	local categoryLayout = Instance.new("UIListLayout")
+	categoryLayout.FillDirection = Enum.FillDirection.Horizontal
+	categoryLayout.Padding = UDim.new(0, 8)
+	categoryLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	categoryLayout.Parent = categoryBar
+
+	for i, category in LeaderboardConfig.Categories do
+		local btn = Theme.createButton({
+			Name = "Category_" .. category.Key, Parent = categoryBar, Text = category.Name,
+			Size = UDim2.fromOffset(160, 40), TextSize = 13, LayoutOrder = i,
+			Bg = category.Key == selectedLeaderboardCategory and Theme.Colors.Gold or Theme.Colors.NavyEdge,
+			OnClick = function()
+				selectedLeaderboardCategory = category.Key
+				renderLeaderboardsTab()
+			end,
+		})
+	end
+
+	local scroll = Instance.new("ScrollingFrame")
+	scroll.Name = "LeaderboardScroll"
+	scroll.Size = UDim2.new(1, -12, 1, -58)
+	scroll.Position = UDim2.fromOffset(6, 52)
+	scroll.BackgroundTransparency = 1
+	scroll.BorderSizePixel = 0
+	scroll.ScrollBarThickness = 10
+	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scroll.CanvasSize = UDim2.fromOffset(0, 0)
+	scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+	scroll.Active = true
+	scroll.ZIndex = 8
+	scroll.Parent = contentFrame
+
+	local listLayout = Instance.new("UIListLayout")
+	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	listLayout.Padding = UDim.new(0, 6)
+	listLayout.Parent = scroll
+
+	local loadingLabel = Theme.createText({
+		Name = "Loading", Parent = scroll, Text = "Loading leaderboard...",
+		Size = UDim2.new(1, 0, 0, 40), TextSize = 14, Font = Theme.Fonts.Body,
+		Color = Theme.Colors.TextMuted, XAlign = Enum.TextXAlignment.Center, ZIndex = 8, LayoutOrder = 1,
+	})
+
+	local requestToken = refreshToken
+	task.spawn(function()
+		local ok, result = pcall(function()
+			return RequestLeaderboard:InvokeServer(selectedLeaderboardCategory)
+		end)
+		if requestToken ~= refreshToken or not scroll.Parent then
+			return
+		end
+		loadingLabel:Destroy()
+		if not ok or typeof(result) ~= "table" or typeof(result.entries) ~= "table" or #result.entries == 0 then
+			Theme.createEmptyState(
+				scroll,
+				Theme.Icons.Trophy,
+				"No Rankings Yet",
+				"Be the first to make the leaderboard!",
+				8
+			)
+			return
+		end
+		for rank, entry in result.entries do
+			local isMe = entry.UserId == player.UserId
+			local row = Theme.createListRow(scroll, {
+				Name = "Rank" .. rank, Height = 44, LayoutOrder = rank, ZIndex = 8,
+				Bg = isMe and Theme.Colors.Gold or Theme.Colors.NavyEdge,
+			})
+			Theme.createText({
+				Name = "RankLabel", Parent = row, Text = "#" .. rank,
+				Size = UDim2.fromOffset(40, 28), Position = UDim2.fromOffset(0, 0),
+				TextSize = 14, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextGold,
+				XAlign = Enum.TextXAlignment.Left, ZIndex = 9,
+			})
+			Theme.createText({
+				Name = "NameLabel", Parent = row, Text = entry.DisplayName .. (isMe and " (You)" or ""),
+				Size = UDim2.new(1, -140, 0, 28), Position = UDim2.fromOffset(44, 0),
+				TextSize = 14, Font = Theme.Fonts.Body, Color = Theme.Colors.TextLight,
+				XAlign = Enum.TextXAlignment.Left, ZIndex = 9,
+			})
+			Theme.createText({
+				Name = "ValueLabel", Parent = row, Text = Theme.formatCompact(entry.Value),
+				Size = UDim2.fromOffset(90, 28), Position = UDim2.new(1, -90, 0, 0),
+				TextSize = 14, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextLight,
+				XAlign = Enum.TextXAlignment.Right, ZIndex = 9,
+			})
+		end
+	end)
 end
 
 local function renderLoadingState()
