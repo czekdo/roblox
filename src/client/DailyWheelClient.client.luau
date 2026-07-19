@@ -41,6 +41,49 @@ local SEGMENT_COLORS = {
 }
 local RIM_COLOR = Color3.fromRGB(255, 215, 120)
 
+-- Per-segment icon shown on the wheel wedge, parallel-indexed to DailyWheelConfig.Segments.
+-- Image icons reuse Theme.Icons where a good match exists; otherwise a plain emoji glyph.
+local SEGMENT_ICONS = {
+	{ Kind = "image", Asset = Theme.Icons.Crystal },
+	{ Kind = "image", Asset = Theme.Icons.Egg },
+	{ Kind = "image", Asset = Theme.Icons.Premium },
+	{ Kind = "image", Asset = Theme.Icons.Crystal },
+	{ Kind = "emoji", Text = "💧" },
+	{ Kind = "image", Asset = Theme.Icons.Egg },
+	{ Kind = "emoji", Text = "⚡" },
+	{ Kind = "emoji", Text = "🎨" },
+}
+
+-- The 6 distinct reward types (some segments above share a type), shown as an always-visible legend.
+local LEGEND_ITEMS = {
+	{ Kind = "image", Asset = Theme.Icons.Crystal, Name = "Dragon Essence" },
+	{ Kind = "image", Asset = Theme.Icons.Egg, Name = "Quest Egg" },
+	{ Kind = "image", Asset = Theme.Icons.Premium, Name = "Premium Gems" },
+	{ Kind = "emoji", Text = "💧", Name = "Boost Potion" },
+	{ Kind = "emoji", Text = "⚡", Name = "Harvest Boost" },
+	{ Kind = "emoji", Text = "🎨", Name = "Decoration" },
+}
+
+-- Builds either an ImageLabel (Kind="image") or a TextLabel showing an emoji glyph (Kind="emoji").
+local function createIconVisual(iconDef, size)
+	if iconDef.Kind == "image" then
+		local img = Instance.new("ImageLabel")
+		img.Size = UDim2.fromOffset(size, size)
+		img.BackgroundTransparency = 1
+		img.Image = iconDef.Asset
+		img.ScaleType = Enum.ScaleType.Fit
+		return img
+	end
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromOffset(size, size)
+	label.BackgroundTransparency = 1
+	label.Text = iconDef.Text
+	label.TextSize = math.floor(size * 0.82)
+	label.Font = Theme.Fonts.Regular
+	label.TextScaled = false
+	return label
+end
+
 local function buildSegmentBoundaries()
 	local n = #SEGMENT_CENTER_ANGLES
 	local boundaries = {}
@@ -178,18 +221,18 @@ local function ensureUi()
 		end
 	end)
 
-	panel = Theme.createPanel({ Name = "WheelPanel", Parent = screenGui, Size = UDim2.fromOffset(400, 520), Visible = false, ZIndex = 25 })
+	panel = Theme.createPanel({ Name = "WheelPanel", Parent = screenGui, Size = UDim2.fromOffset(400, 620), Visible = false, ZIndex = 25 })
 	panel:SetAttribute("OpenPosition", panel.Position)
 	Theme.createCloseButton(panel, function()
 		UIBridge.ClosePanel("DailyWheel")
 	end, 30)
 	Theme.createWindowHeader(panel, "Daily Wheel", "One free spin every day", 30)
 
-	local wheelSize = 236
+	local wheelSize = 210
 	local wheelContainer = Theme.createFrame({
 		Name = "WheelContainer", Parent = panel,
 		Size = UDim2.fromOffset(wheelSize, wheelSize),
-		Position = UDim2.new(0.5, 0, 0, 90), AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 80), AnchorPoint = Vector2.new(0.5, 0),
 		Bg = Color3.new(0, 0, 0), BgTransparency = 1, ZIndex = 8,
 	})
 
@@ -204,24 +247,82 @@ local function ensureUi()
 	wheelImageLabel.ImageContent = Content.fromObject(buildWheelImage())
 	wheelImageLabel.Parent = wheelContainer
 
+	-- Icon overlays, parented to the rotating wheelImageLabel so they spin together with it
+	-- (GuiObject.Rotation cascades to descendants, so no extra angle math is needed here).
+	local iconRadius = wheelSize * 0.335
+	for i, angle in SEGMENT_CENTER_ANGLES do
+		local iconDef = SEGMENT_ICONS[i]
+		if iconDef then
+			local rad = math.rad(angle)
+			local dx = iconRadius * math.sin(rad)
+			local dy = -iconRadius * math.cos(rad)
+			local iconSize = 26
+			local icon = createIconVisual(iconDef, iconSize)
+			icon.Name = "SegmentIcon" .. i
+			icon.AnchorPoint = Vector2.new(0.5, 0.5)
+			icon.Position = UDim2.new(0.5, dx, 0.5, dy)
+			icon.ZIndex = 9
+			if icon:IsA("TextLabel") then
+				icon.TextXAlignment = Enum.TextXAlignment.Center
+				icon.TextYAlignment = Enum.TextYAlignment.Center
+			end
+			icon.Parent = wheelImageLabel
+		end
+	end
+
 	local pointer = Theme.createFrame({
 		Name = "Pointer", Parent = wheelContainer,
 		Size = UDim2.fromOffset(18, 18),
 		Position = UDim2.new(0.5, 0, 0, -6), AnchorPoint = Vector2.new(0.5, 0.5),
-		Bg = Theme.Colors.Danger or Color3.fromRGB(235, 70, 70), ZIndex = 9,
+		Bg = Theme.Colors.Danger or Color3.fromRGB(235, 70, 70), ZIndex = 10,
 	})
 	pointer.Rotation = 45
 
+	-- Always-visible legend of the 6 distinct reward types, so the player knows what's on the
+	-- wheel before spinning.
+	local legendContainer = Theme.createFrame({
+		Name = "Legend", Parent = panel,
+		Size = UDim2.new(1, -32, 0, 96), Position = UDim2.fromOffset(16, 304),
+		Bg = Theme.Colors.PanelInner, BgTransparency = 0.35, Corner = Theme.Corner.Medium, ZIndex = 8,
+	})
+	local legendGrid = Instance.new("UIGridLayout")
+	legendGrid.CellSize = UDim2.new(0.5, -6, 0, 26)
+	legendGrid.CellPadding = UDim2.fromOffset(6, 4)
+	legendGrid.SortOrder = Enum.SortOrder.LayoutOrder
+	legendGrid.Parent = legendContainer
+	Theme.padding(legendContainer, 8, 8, 8, 8)
+
+	for i, item in LEGEND_ITEMS do
+		local cell = Theme.createFrame({
+			Name = "LegendItem" .. i, Parent = legendContainer,
+			Bg = Color3.new(0, 0, 0), BgTransparency = 1, ZIndex = 8, LayoutOrder = i,
+		})
+		local icon = createIconVisual(item, 20)
+		icon.Position = UDim2.fromOffset(0, 3)
+		icon.ZIndex = 9
+		if icon:IsA("TextLabel") then
+			icon.TextXAlignment = Enum.TextXAlignment.Center
+			icon.TextYAlignment = Enum.TextYAlignment.Center
+		end
+		icon.Parent = cell
+		Theme.createText({
+			Name = "Label", Parent = cell, Text = item.Name,
+			Size = UDim2.new(1, -26, 1, 0), Position = UDim2.fromOffset(26, 0),
+			TextSize = 12, Font = Theme.Fonts.Body, Color = Theme.Colors.TextLight,
+			XAlign = Enum.TextXAlignment.Left, ZIndex = 9,
+		})
+	end
+
 	statusLabel = Theme.createText({
 		Name = "Status", Parent = panel, Text = "",
-		Size = UDim2.new(1, -32, 0, 50), Position = UDim2.fromOffset(16, 340),
+		Size = UDim2.new(1, -32, 0, 40), Position = UDim2.fromOffset(16, 410),
 		TextSize = 14, Font = Theme.Fonts.Body, Color = Theme.Colors.TextMuted,
 		Wrapped = true, YAlign = Enum.TextYAlignment.Top, XAlign = Enum.TextXAlignment.Center, ZIndex = 8,
 	})
 
 	resultLabel = Theme.createText({
 		Name = "Result", Parent = panel, Text = "",
-		Size = UDim2.new(1, -32, 0, 60), Position = UDim2.fromOffset(16, 398),
+		Size = UDim2.new(1, -32, 0, 60), Position = UDim2.fromOffset(16, 458),
 		TextSize = 18, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextGold,
 		Wrapped = true, XAlign = Enum.TextXAlignment.Center, ZIndex = 8,
 	})
