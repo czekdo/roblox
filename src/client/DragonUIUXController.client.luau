@@ -551,8 +551,6 @@ _G.DragonIslandOpenSettings = function()
 		}
 	)
 end
-_G.DragonIslandOpenMail = function() openExtrasPanel("Mail", "No new mail yet. Quest rewards and event gifts will show up here.") end
-_G.DragonIslandOpenDailyReward = function() openExtrasPanel("Daily Rewards", "Your daily reward is ready! Claim streak bonuses for consecutive logins.") end
 
 local navOrder = { "EggShop", "Dragons", "DragonMerge", "DragonTraining", "Workshop", "Buildings", "DailyQuests", "Achievements", "Rebirth" }
 local order = 1

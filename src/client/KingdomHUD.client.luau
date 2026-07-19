@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
+local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
 local HarvestConfig = require(ReplicatedStorage:WaitForChild("HarvestConfig"))
 local HarvestUIUpdate = ReplicatedStorage:WaitForChild("HarvestEvents"):WaitForChild("HarvestUIUpdate")
 
@@ -148,23 +149,43 @@ Theme.createIconButton({
 	Stroke = true, StrokeColor = Theme.Colors.Gold, StrokeTransparency = 0.2,
 	OnClick = function() if _G.DragonIslandOpenSettings then _G.DragonIslandOpenSettings() end end,
 })
-Theme.createIconButton({
+local mailButton = Theme.createIconButton({
 	Name = "MailButton", Parent = rightWrap, Size = UDim2.fromOffset(44, 44),
-	Bg = Theme.Colors.TopBarCapsule, Image = Theme.Icons.Mail, LayoutOrder = 3,
+	Bg = Theme.Colors.TopBarCapsule, Image = Theme.Icons.Mail, LayoutOrder = 3, Badge = " ",
 	Stroke = true, StrokeColor = Theme.Colors.Gold, StrokeTransparency = 0.2,
 	OnClick = function() if _G.DragonIslandOpenMail then _G.DragonIslandOpenMail() end end,
 })
-Theme.createIconButton({
+local dailyRewardButton = Theme.createIconButton({
 	Name = "DailyRewardButton", Parent = rightWrap, Size = UDim2.fromOffset(44, 44),
-	Bg = Theme.Colors.TopBarCapsule, Image = Theme.Icons.Gift, LayoutOrder = 4, Badge = "1",
+	Bg = Theme.Colors.TopBarCapsule, Image = Theme.Icons.Gift, LayoutOrder = 4, Badge = " ",
 	Stroke = true, StrokeColor = Theme.Colors.Gold, StrokeTransparency = 0.2,
 	OnClick = function() if _G.DragonIslandOpenDailyReward then _G.DragonIslandOpenDailyReward() end end,
 })
+
+local mailBadge = mailButton:FindFirstChild("Badge")
+mailBadge.Visible = false
+local dailyRewardBadge = dailyRewardButton:FindFirstChild("Badge")
+dailyRewardBadge.Visible = false
+
+UIBridge.Subscribe("MailUnreadChanged", function(count)
+	mailBadge.Text = tostring(count)
+	mailBadge.Visible = count > 0
+end)
+UIBridge.Subscribe("DailyRewardAvailableChanged", function(available)
+	dailyRewardBadge.Text = "!"
+	dailyRewardBadge.Visible = available == true
+end)
 Theme.createIconButton({
 	Name = "DailyWheelButton", Parent = rightWrap, Size = UDim2.fromOffset(44, 44),
 	Bg = Theme.Colors.TopBarCapsule, Image = Theme.Icons.Trophy, LayoutOrder = 5,
 	Stroke = true, StrokeColor = Theme.Colors.Gold, StrokeTransparency = 0.2,
 	OnClick = function() if _G.DragonIslandOpenDailyWheel then _G.DragonIslandOpenDailyWheel() end end,
+})
+Theme.createIconButton({
+	Name = "ShopButton", Parent = rightWrap, Size = UDim2.fromOffset(44, 44),
+	Bg = Theme.Colors.TopBarCapsule, Image = Theme.Icons.Diamond, LayoutOrder = 6,
+	Stroke = true, StrokeColor = Theme.Colors.Gold, StrokeTransparency = 0.2,
+	OnClick = function() if _G.DragonIslandOpenShop then _G.DragonIslandOpenShop() end end,
 })
 
 local function refreshKingdomStatus()
