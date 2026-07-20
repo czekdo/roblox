@@ -235,7 +235,7 @@ function DragonInventoryService.ComputePowerScore(player, record)
 	local d = requireDeps()
 	local dragonType = record.dragonType or record.type
 	local evolutionLevel = DragonEggConfig.SanitizeEvolutionLevel(record.evolutionLevel)
-	local stats = d.getDragonStats(record.level, record.rarity, evolutionLevel)
+	local stats = d.getDragonStats(record.level, record.rarity, evolutionLevel, dragonType)
 	local abilityPayload = d.DragonAbilityService.GetAbilityPayload(player, dragonType)
 	return DragonPowerScore.Compute({
 		level = record.level,
@@ -389,9 +389,9 @@ end
 function DragonInventoryService.BuildInventoryEntry(player, data, record, groupCounts)
 	local d = requireDeps()
 	local evolutionLevel = DragonEggConfig.SanitizeEvolutionLevel(record.evolutionLevel)
-	local stats = d.getDragonStats(record.level, record.rarity, evolutionLevel)
+	local stats = d.getDragonStats(record.level, record.rarity, evolutionLevel, record.dragonType)
 	local nextStats = evolutionLevel < DragonEggConfig.GetEvolutionMaxLevel()
-		and d.getDragonStats(record.level, record.rarity, evolutionLevel + 1)
+		and d.getDragonStats(record.level, record.rarity, evolutionLevel + 1, record.dragonType)
 		or stats
 	local mergeKey = table.concat({ record.dragonType, record.rarity or "Common", tostring(evolutionLevel) }, "|")
 	local matchingCount = groupCounts and groupCounts[mergeKey] or 0
@@ -428,6 +428,19 @@ function DragonInventoryService.BuildInventoryEntry(player, data, record, groupC
 	}
 end
 
+-- Sum of every owned dragon's power score (equipped + storage), mirrored onto the "DragonPower"
+-- attribute below for the leaderboard (see LeaderboardConfig) to read. Recomputed here rather than
+-- incrementally, since BuildInventoryPayload already walks every owned dragon for the roster UI and
+-- is called after every roster-affecting action (hatch/merge/equip/unequip/upgrade/sell/load).
+function DragonInventoryService.ComputeTotalPower(player, data)
+	data = DragonInventoryService.EnsureStore(data)
+	local total = 0
+	for _, record in data.ownedDragonById do
+		total += DragonInventoryService.ComputePowerScore(player, record)
+	end
+	return total
+end
+
 function DragonInventoryService.BuildInventoryPayload(player, data, message)
 	local d = requireDeps()
 	data = DragonInventoryService.EnsureStore(data)
@@ -442,13 +455,18 @@ function DragonInventoryService.BuildInventoryPayload(player, data, message)
 	end
 
 	local inventory = {}
+	local totalPower = 0
 	for _, record in data.ownedDragonById do
-		table.insert(inventory, DragonInventoryService.BuildInventoryEntry(player, data, record, groupCounts))
+		local entry = DragonInventoryService.BuildInventoryEntry(player, data, record, groupCounts)
+		totalPower += entry.powerScore
+		table.insert(inventory, entry)
 	end
+	player:SetAttribute("DragonPower", math.floor(totalPower))
 
 	return {
 		essence = data.essence,
 		dragons = inventory,
+		totalPower = totalPower,
 		mergeStats = d.sanitizeMergeStats(data.mergeStats),
 		maxEvolutionLevel = DragonEggConfig.GetEvolutionMaxLevel(),
 		activeCount = DragonInventoryService.GetEquippedCount(data),

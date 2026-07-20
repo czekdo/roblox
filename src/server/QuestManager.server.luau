@@ -11,6 +11,7 @@ local QuestProgressSignal = QuestEvents:WaitForChild("QuestProgressSignal")
 local TutorialEvents = ReplicatedStorage:WaitForChild("TutorialEvents")
 local TutorialProgressSignal = TutorialEvents:WaitForChild("TutorialProgressSignal")
 local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
 
 local dragonsFolder = workspace:WaitForChild("DragonWorkers")
 
@@ -381,6 +382,9 @@ local function trackIsland(island)
 end
 
 ClaimQuest.OnServerEvent:Connect(function(player, questId)
+	if not RateLimiter.check(player, "ClaimQuest", 0.3) then
+		return
+	end
 	local data = playerQuestData[player]
 	local quest = questById[questId]
 	if not data or not quest then

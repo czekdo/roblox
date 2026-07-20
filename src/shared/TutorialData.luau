@@ -118,6 +118,15 @@ TutorialData.Steps = {
 		Reward = { { Type = "DragonEssence", Amount = 50 } },
 	},
 	{
+		Id = "ExplainSellShop",
+		Title = "Sell Shop",
+		Description = "Sell duplicate dragons and spare items for Dragon Essence, one at a time or all at once.",
+		ActionHint = "Open the Sell Shop to see what your dragons are worth.",
+		Kind = "info",
+		Target = { nav = "SellShopButton" },
+		Reward = { { Type = "DragonEssence", Amount = 75 } },
+	},
+	{
 		Id = "IntroduceAscensionGate",
 		Title = "Ascension Gate",
 		Description = "When your kingdom is mighty enough, the Ascension Gate offers rebirth — permanent bonuses at the cost of a reset. Explore it anytime; ascension is never required.",

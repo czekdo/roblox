@@ -100,6 +100,23 @@ function IslandUnlockConfig.GetEssenceMultiplier(islandId)
 	return IslandUnlockConfig.EssenceMultiplier[islandId] or 1
 end
 
+-- Crystal node HP multiplier per island, applied on top of HarvestConfig.NodeMaxHealth. Later
+-- islands give more essence per hit (see EssenceMultiplier above), so their crystals also need
+-- more HP - otherwise a high-value node would deplete almost instantly.
+IslandUnlockConfig.HealthMultiplier = {
+	Forest = 1.0,
+	Cold = 1.3,
+	Lava = 1.7,
+	Storm = 2.2,
+	Shadow = 2.8,
+	Crystal = 3.5,
+	Celestial = 4.5,
+}
+
+function IslandUnlockConfig.GetHealthMultiplier(islandId)
+	return IslandUnlockConfig.HealthMultiplier[islandId] or 1
+end
+
 function IslandUnlockConfig.GetIslandById(islandId)
 	for _, island in IslandUnlockConfig.Islands do
 		if island.Id == islandId then

@@ -5,6 +5,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local DragonTrainingConfig = require(ReplicatedStorage:WaitForChild("DragonTrainingConfig"))
 local DragonRosterBridge = require(script.Parent:WaitForChild("DragonRosterBridge"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
+local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 local HarvestEvents = ReplicatedStorage:WaitForChild("HarvestEvents")
 local RequestDragonTrainingData = HarvestEvents:WaitForChild("RequestDragonTrainingData")
 local StartDragonTraining = HarvestEvents:WaitForChild("StartDragonTraining")
@@ -280,7 +282,10 @@ local function startTraining(player, dragonId, programId)
 	end
 
 	if programPayload.essenceCost > 0 then
-		player:SetAttribute("DragonEssence", essence - programPayload.essenceCost)
+		local found = AdminBridge.call("Harvest", "adjustEssence", player, -programPayload.essenceCost)
+		if not found then
+			player:SetAttribute("DragonEssence", essence - programPayload.essenceCost)
+		end
 	end
 
 	local now = getServerNow()
@@ -344,10 +349,16 @@ RequestDragonTrainingData.OnServerInvoke = function(player)
 end
 
 StartDragonTraining.OnServerEvent:Connect(function(player, dragonId, programId)
+	if not RateLimiter.check(player, "StartDragonTraining", 0.3) then
+		return
+	end
 	startTraining(player, dragonId, programId)
 end)
 
 ClaimDragonTraining.OnServerEvent:Connect(function(player, sessionId)
+	if not RateLimiter.check(player, "ClaimDragonTraining", 0.3) then
+		return
+	end
 	claimTraining(player, sessionId)
 end)
 

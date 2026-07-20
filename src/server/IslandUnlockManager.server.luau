@@ -9,6 +9,8 @@ local IslandPortalRegistry = require(ReplicatedStorage:WaitForChild("IslandPorta
 local BiomeResourceRegistry = require(ReplicatedStorage:WaitForChild("BiomeResourceRegistry"))
 local IslandTeleportService = require(ServerScriptService:WaitForChild("IslandTeleportService"))
 local AscensionBonusService = require(ServerScriptService:WaitForChild("AscensionBonusService"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
+local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 local IslandEvents = ReplicatedStorage:WaitForChild("IslandEvents")
 local IslandUnlockState = IslandEvents:WaitForChild("IslandUnlockState")
 local IslandUnlockFeedback = IslandEvents:WaitForChild("IslandUnlockFeedback")
@@ -171,13 +173,21 @@ local function queueSave(player)
 	end)
 end
 
+-- Routes through AdminBridge's Harvest.adjustEssence (which updates DragonHarvestManager's private
+-- essence ledger, not just the attribute) instead of a raw SetAttribute. A raw SetAttribute here would
+-- get silently reverted by DragonHarvestManager's next harvest-tick UI sync, which unconditionally
+-- mirrors its own ledger back onto the attribute - effectively refunding whatever this just spent.
 local function changeEssence(player, delta)
 	local essence = player:GetAttribute("DragonEssence") or 0
 	if essence + delta < 0 then
 		return false
 	end
-	player:SetAttribute("DragonEssence", essence + delta)
-	HarvestUIUpdate:FireClient(player, essence + delta)
+	local found, newEssence = AdminBridge.call("Harvest", "adjustEssence", player, delta)
+	if not found then
+		newEssence = essence + delta
+		player:SetAttribute("DragonEssence", newEssence)
+	end
+	HarvestUIUpdate:FireClient(player, newEssence)
 	return true
 end
 
@@ -644,6 +654,9 @@ workspace.ChildAdded:Connect(function(child)
 end)
 
 IslandUnlockRequest.OnServerEvent:Connect(function(player, islandId)
+	if not RateLimiter.check(player, "IslandUnlockRequest", 0.3) then
+		return
+	end
 	if typeof(islandId) ~= "string" then
 		return
 	end
@@ -690,8 +703,6 @@ Players.PlayerRemoving:Connect(function(player)
 	saveQueued[player] = nil
 	teleportCooldown[player] = nil
 end)
-
-local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 
 local function adminUnlockIsland(player, islandId)
 	local island = IslandUnlockConfig.GetIslandById(islandId)

@@ -211,6 +211,53 @@ for _, eggId in SECRET_DRAGON_EGGS do
 	end
 end
 
+-- Base combat/harvest power multiplier per species, applied in getDragonStats on top of rarity,
+-- level, and evolution (star) bonuses. Escalates with island unlock order, so a dragon from a
+-- later island is inherently stronger than one from an earlier island at the same level/rarity/
+-- stars. FireDragon is not island-gated (see Fire egg above) so it sits at the same baseline as
+-- the first island's dragon. Secret dragons (see SECRET_DRAGON_EGGS above) are deliberately far
+-- above even the best island dragon, since pulling one is a ~0.5% event.
+DragonEggConfig.SpeciesPowerMultiplier = {
+	ForestDragon = 1.0,
+	FireDragon = 1.0,
+	IceDragon = 1.15,
+	LavaDragon = 1.3,
+	StormDragon = 1.5,
+	VoidDragon = 1.7,
+	CrystalDragon = 2.0,
+	CelestialDragon = 2.5,
+	PoisonDragon = 5.0,
+	CoralOceanDragon = 5.0,
+}
+
+function DragonEggConfig.GetSpeciesPowerMultiplier(dragonType)
+	return DragonEggConfig.SpeciesPowerMultiplier[dragonType] or 1
+end
+
+-- Sell Shop base value per rarity tier (before level/evolution/species multipliers). Escalates
+-- roughly in step with how hard each rarity is to pull, so selling a lucky pull is meaningfully
+-- rewarding without ever being a better deal than actually using the dragon.
+DragonEggConfig.SellValueByRarity = {
+	Common = 50,
+	Rare = 200,
+	Epic = 800,
+	Legendary = 3000,
+	Mythic = 10000,
+	Ancient = 30000,
+}
+
+-- Sell value formula, reusing the same level/star/species multipliers getDragonStats uses, so a
+-- stronger dragon always sells for more - selling never outpaces the value of keeping and using it.
+function DragonEggConfig.GetDragonSellValue(rarity, level, evolutionLevel, dragonType)
+	local base = DragonEggConfig.SellValueByRarity[rarity or "Common"] or DragonEggConfig.SellValueByRarity.Common
+	local safeLevel = math.max(1, math.floor(tonumber(level) or 1))
+	local safeEvolutionLevel = DragonEggConfig.SanitizeEvolutionLevel(evolutionLevel)
+	local levelMultiplier = 1 + (safeLevel - 1) * 0.15
+	local evolutionMultiplier = 1 + safeEvolutionLevel * 0.5
+	local speciesMultiplier = DragonEggConfig.GetSpeciesPowerMultiplier(dragonType)
+	return math.floor(base * levelMultiplier * evolutionMultiplier * speciesMultiplier + 0.5)
+end
+
 -- Order matches island unlock progression (Forest, Cold, Lava, Storm, Shadow, Crystal, Celestial),
 -- with Fire (not island-gated) placed right after the first two, and Ancient (reserved) last.
 DragonEggConfig.EggOrder = { "Common", "Forest", "Ice", "Fire", "Lava", "Storm", "Shadow", "Crystal", "Celestial", "Ancient" }
@@ -284,6 +331,17 @@ function DragonEggConfig.GetRarityInfo(rarityName)
 		end
 	end
 	return DragonEggConfig.Rarities[1]
+end
+
+-- 0 (Common) through 5 (Ancient) - how far up the rarity list this tier sits. Used to scale
+-- cosmetic polish (glow/sparkle) so higher rarities visibly stand out even before any merging.
+function DragonEggConfig.GetRarityTier(rarityName)
+	for index, rarity in DragonEggConfig.Rarities do
+		if rarity.Name == rarityName then
+			return index - 1
+		end
+	end
+	return 0
 end
 
 function DragonEggConfig.GetRarityDropChances()

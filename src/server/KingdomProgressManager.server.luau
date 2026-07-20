@@ -5,6 +5,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local BuildingConfig = require(ReplicatedStorage:WaitForChild("BuildingConfig"))
 local WorkspaceLayout = require(ReplicatedStorage:WaitForChild("WorkspaceLayout"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
+local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 local KingdomEvents = ReplicatedStorage:WaitForChild("KingdomEvents")
 local RequestKingdomData = KingdomEvents:WaitForChild("RequestKingdomData")
 local UpdateKingdomName = KingdomEvents:WaitForChild("UpdateKingdomName")
@@ -333,12 +335,19 @@ local function loadPlayer(player)
 	sendState(player)
 end
 
+-- Routes through AdminBridge's Harvest.adjustEssence (which updates DragonHarvestManager's private
+-- essence ledger, not just the attribute) instead of a raw SetAttribute. A raw SetAttribute here would
+-- get silently reverted by DragonHarvestManager's next harvest-tick UI sync, which unconditionally
+-- mirrors its own ledger back onto the attribute - effectively refunding whatever this just spent.
 local function changeEssence(player, delta)
 	local essence = player:GetAttribute("DragonEssence") or 0
 	if essence + delta < 0 then
 		return false
 	end
-	player:SetAttribute("DragonEssence", essence + delta)
+	local found = AdminBridge.call("Harvest", "adjustEssence", player, delta)
+	if not found then
+		player:SetAttribute("DragonEssence", essence + delta)
+	end
 	return true
 end
 
@@ -347,6 +356,9 @@ RequestKingdomData.OnServerInvoke = function(player)
 end
 
 UpdateKingdomName.OnServerEvent:Connect(function(player, newName)
+	if not RateLimiter.check(player, "UpdateKingdomName", 1) then
+		return
+	end
 	local data = getData(player)
 	data.kingdomName = sanitizeName(newName)
 	queueSave(player)
@@ -403,6 +415,9 @@ local function placeDecorationForPlayer(player, decorationId, worldX, worldZ, sk
 end
 
 PlaceDecoration.OnServerEvent:Connect(function(player, decorationId, worldX, worldZ)
+	if not RateLimiter.check(player, "PlaceDecoration", 0.2) then
+		return
+	end
 	placeDecorationForPlayer(player, decorationId, worldX, worldZ, false)
 end)
 
@@ -450,8 +465,6 @@ Players.PlayerRemoving:Connect(function(player)
 	decorationFolders[player] = nil
 	saveQueued[player] = nil
 end)
-
-local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 
 AdminBridge.register("Kingdom", {
 	refreshState = function(player)

@@ -5,6 +5,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local DailyWheelConfig = require(ReplicatedStorage:WaitForChild("DailyWheelConfig"))
 local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
 
 local WheelEvents = ReplicatedStorage:WaitForChild("WheelEvents")
 local RequestWheelState = WheelEvents:WaitForChild("RequestWheelState")
@@ -89,6 +90,9 @@ RequestWheelState.OnServerInvoke = function(player)
 end
 
 RequestSpin.OnServerEvent:Connect(function(player)
+	if not RateLimiter.check(player, "RequestSpin", 0.5) then
+		return
+	end
 	local data = playerData[player]
 	if not data then
 		return

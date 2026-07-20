@@ -193,6 +193,12 @@ Theme.createIconButton({
 	Stroke = true, StrokeColor = Theme.Colors.Gold, StrokeTransparency = 0.2,
 	OnClick = function() if _G.DragonIslandOpenTrade then _G.DragonIslandOpenTrade() end end,
 })
+Theme.createIconButton({
+	Name = "SellShopButton", Parent = rightWrap, Size = UDim2.fromOffset(44, 44),
+	Bg = Theme.Colors.TopBarCapsule, Image = Theme.Icons.Diamond, LayoutOrder = 8,
+	Stroke = true, StrokeColor = Theme.Colors.Gold, StrokeTransparency = 0.2,
+	OnClick = function() if _G.DragonIslandOpenSellShop then _G.DragonIslandOpenSellShop() end end,
+})
 
 local function refreshKingdomStatus()
 	kingdomNameLabel.Text = string.upper(getKingdomName())

@@ -4,6 +4,7 @@ local DataStoreService = game:GetService("DataStoreService")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
 
 local MailEvents = ReplicatedStorage:WaitForChild("MailEvents")
 local RequestMailList = MailEvents:WaitForChild("RequestMailList")
@@ -100,6 +101,9 @@ RequestMailList.OnServerInvoke = function(player)
 end
 
 ClaimMail.OnServerEvent:Connect(function(player, mailId)
+	if not RateLimiter.check(player, "ClaimMail", 0.3) then
+		return
+	end
 	local mail = playerMail[player]
 	if not mail or typeof(mailId) ~= "string" then
 		return

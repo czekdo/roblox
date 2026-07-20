@@ -5,6 +5,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local DailyRewardConfig = require(ReplicatedStorage:WaitForChild("DailyRewardConfig"))
 local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
 
 local DailyRewardEvents = ReplicatedStorage:WaitForChild("DailyRewardEvents")
 local RequestDailyRewardState = DailyRewardEvents:WaitForChild("RequestDailyRewardState")
@@ -101,6 +102,9 @@ RequestDailyRewardState.OnServerInvoke = function(player)
 end
 
 ClaimDailyReward.OnServerEvent:Connect(function(player)
+	if not RateLimiter.check(player, "ClaimDailyReward", 0.5) then
+		return
+	end
 	local data = playerData[player]
 	if not data then
 		return

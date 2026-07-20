@@ -4,13 +4,27 @@ local DataStoreService = game:GetService("DataStoreService")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local InventoryItemConfig = require(ReplicatedStorage:WaitForChild("InventoryItemConfig"))
+local WorkshopCraftConfig = require(ReplicatedStorage:WaitForChild("WorkshopCraftConfig"))
 local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
 
 local InventoryEvents = ReplicatedStorage:WaitForChild("InventoryEvents")
 local RequestInventoryData = InventoryEvents:WaitForChild("RequestInventoryData")
 local UseInventoryItem = InventoryEvents:WaitForChild("UseInventoryItem")
 local InventoryStateUpdated = InventoryEvents:WaitForChild("InventoryStateUpdated")
 local GrantInventoryItem = InventoryEvents:WaitForChild("GrantInventoryItem")
+local SellInventoryItem = InventoryEvents:WaitForChild("SellInventoryItem")
+
+-- Sell value is half of whatever recipe crafts this item (a fair "recover some investment" price,
+-- consistent across every craftable item without hand-maintaining a second price list).
+local function getItemSellValue(itemId)
+	for _, recipe in WorkshopCraftConfig.Recipes do
+		if recipe.Reward and recipe.Reward.Type == "InventoryItem" and recipe.Reward.ItemId == itemId then
+			return math.floor((recipe.Cost or 0) * 0.5)
+		end
+	end
+	return 0
+end
 
 local INVENTORY_DATASTORE = "DragonIslandInventoryV1"
 local inventoryStore = nil
@@ -148,6 +162,9 @@ RequestInventoryData.OnServerInvoke = function(player)
 end
 
 UseInventoryItem.OnServerEvent:Connect(function(player, itemId)
+	if not RateLimiter.check(player, "UseInventoryItem", 0.3) then
+		return
+	end
 	itemId = tostring(itemId or "")
 	local data = playerData[player]
 	local itemDef = InventoryItemConfig.GetItem(itemId)
@@ -168,6 +185,39 @@ UseInventoryItem.OnServerEvent:Connect(function(player, itemId)
 
 	RewardService.Grant(player, itemDef.Effect, { Source = "Inventory", ApplyAscensionBonus = false, NotifyUI = true })
 	sendState(player, "Used " .. itemDef.DisplayName)
+	queueSave(player)
+end)
+
+-- amount: how many to sell. Clamped to what's actually owned, so a stale client-side count can't
+-- oversell.
+SellInventoryItem.OnServerEvent:Connect(function(player, itemId, amount)
+	if not RateLimiter.check(player, "SellInventoryItem", 0.3) then
+		return
+	end
+	itemId = tostring(itemId or "")
+	local data = playerData[player]
+	local itemDef = InventoryItemConfig.GetItem(itemId)
+	if not data or not itemDef then
+		return
+	end
+
+	local owned = data.Items[itemId] or 0
+	local sellCount = math.clamp(math.floor(tonumber(amount) or 0), 0, owned)
+	if sellCount < 1 then
+		sendState(player, "Nothing to sell")
+		return
+	end
+
+	local sellValue = getItemSellValue(itemId) * sellCount
+	data.Items[itemId] = owned - sellCount
+	if data.Items[itemId] <= 0 then
+		data.Items[itemId] = nil
+	end
+
+	if sellValue > 0 then
+		RewardService.Grant(player, { Type = "DragonEssence", Amount = sellValue }, { Source = "SellShop" })
+	end
+	sendState(player, "Sold " .. sellCount .. "x " .. itemDef.DisplayName .. " for " .. sellValue .. " Essence")
 	queueSave(player)
 end)
 

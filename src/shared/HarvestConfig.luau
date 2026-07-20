@@ -11,7 +11,7 @@ return {
 	CrystalSpawnYOffset = 1.25,
 	DragonScaleMultiplier = 1.7,
 	BaseDragonScale = 1.7,
-	HoverHeight = 4.76,
+	HoverHeight = 2.6,
 	BobAmplitude = 0.68,
 	HarvestDistance = 10.2,
 	HarvestStandoff = 3.4,

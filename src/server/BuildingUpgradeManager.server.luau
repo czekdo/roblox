@@ -5,6 +5,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local BuildingConfig = require(ReplicatedStorage:WaitForChild("BuildingConfig"))
 local DragonInventoryConfig = require(ReplicatedStorage:WaitForChild("DragonInventoryConfig"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
+local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 local WorkspaceLayout = require(ReplicatedStorage:WaitForChild("WorkspaceLayout"))
 local BuildingEvents = ReplicatedStorage:WaitForChild("BuildingEvents")
 local RequestBuildingData = BuildingEvents:WaitForChild("RequestBuildingData")
@@ -340,12 +342,19 @@ local function loadPlayerBuildings(player)
 	end
 end
 
+-- Routes through AdminBridge's Harvest.adjustEssence (which updates DragonHarvestManager's private
+-- essence ledger, not just the attribute) instead of a raw SetAttribute. A raw SetAttribute here would
+-- get silently reverted by DragonHarvestManager's next harvest-tick UI sync, which unconditionally
+-- mirrors its own ledger back onto the attribute - effectively refunding whatever this just spent.
 local function changeEssence(player, delta)
 	local essence = player:GetAttribute("DragonEssence") or 0
 	if essence + delta < 0 then
 		return false
 	end
-	player:SetAttribute("DragonEssence", essence + delta)
+	local found = AdminBridge.call("Harvest", "adjustEssence", player, delta)
+	if not found then
+		player:SetAttribute("DragonEssence", essence + delta)
+	end
 	return true
 end
 
@@ -362,6 +371,9 @@ RequestBuildingData.OnServerInvoke = function(player)
 end
 
 UnlockBuilding.OnServerEvent:Connect(function(player, buildingId)
+	if not RateLimiter.check(player, "UnlockBuilding", 0.3) then
+		return
+	end
 	local typeId = tostring(buildingId)
 	if not isFixedBuilding(typeId) or not getFixedBuildingModel(player, typeId) then
 		sendState(player, "Building not found")
@@ -391,6 +403,9 @@ UnlockBuilding.OnServerEvent:Connect(function(player, buildingId)
 end)
 
 UpgradeBuilding.OnServerEvent:Connect(function(player, buildingId)
+	if not RateLimiter.check(player, "UpgradeBuilding", 0.3) then
+		return
+	end
 	local typeId = tostring(buildingId)
 	if not isFixedBuilding(typeId) or not getFixedBuildingModel(player, typeId) then
 		sendState(player, "Building not found")
@@ -449,8 +464,6 @@ task.spawn(function()
 		end
 	end
 end)
-
-local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 
 AdminBridge.register("Buildings", {
 	setLevel = function(player, buildingId, level)

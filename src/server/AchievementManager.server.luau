@@ -10,6 +10,7 @@ local IslandUnlockConfig = require(ReplicatedStorage:WaitForChild("IslandUnlockC
 local BuildingConfig = require(ReplicatedStorage:WaitForChild("BuildingConfig"))
 local WorkspaceLayout = require(ReplicatedStorage:WaitForChild("WorkspaceLayout"))
 local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
 
 local AchievementEvents = ReplicatedStorage:WaitForChild("AchievementEvents")
 local AchievementUpdate = AchievementEvents:WaitForChild("AchievementUpdate")
@@ -558,6 +559,9 @@ QuestProgressSignal.Event:Connect(function(player, questId, amount)
 end)
 
 ClaimAchievement.OnServerEvent:Connect(function(player, achievementId)
+	if not RateLimiter.check(player, "ClaimAchievement", 0.3) then
+		return
+	end
 	local achievement = AchievementConfig.GetAchievement(tostring(achievementId or ""))
 	local data = getData(player)
 	if not achievement or not data.loaded then

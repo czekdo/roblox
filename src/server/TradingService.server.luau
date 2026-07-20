@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
 
 local TradeEvents = ReplicatedStorage:WaitForChild("TradeEvents")
 local RequestServerPlayers = TradeEvents:WaitForChild("RequestServerPlayers")
@@ -179,6 +180,9 @@ RequestTradeableDragons.OnServerInvoke = function(player)
 end
 
 RequestTrade.OnServerEvent:Connect(function(player, targetUserId)
+	if not RateLimiter.check(player, "RequestTrade", 0.5) then
+		return
+	end
 	if sessionByPlayer[player] then
 		return
 	end
@@ -270,6 +274,9 @@ UpdateOffer.OnServerEvent:Connect(function(player, payload)
 end)
 
 ConfirmOffer.OnServerEvent:Connect(function(player)
+	if not RateLimiter.check(player, "ConfirmOffer", 0.3) then
+		return
+	end
 	local session = sessionByPlayer[player]
 	if not session then
 		return

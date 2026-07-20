@@ -4,6 +4,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local HarvestConfig = require(ReplicatedStorage:WaitForChild("HarvestConfig"))
 local BiomeResourceConfig = require(ReplicatedStorage:WaitForChild("BiomeResourceConfig"))
 local BiomeResourceRegistry = require(ReplicatedStorage:WaitForChild("BiomeResourceRegistry"))
+local IslandUnlockConfig = require(ReplicatedStorage:WaitForChild("IslandUnlockConfig"))
 
 local BiomeResourcePlacer = {}
 
@@ -388,14 +389,16 @@ local function createHarvestableNode(canonicalName, islandId, spawnId, placement
 	node.PrimaryPart = hitbox
 	node:PivotTo(hitboxCFrame)
 
+	local maxHealth = math.floor(HarvestConfig.NodeMaxHealth * IslandUnlockConfig.GetHealthMultiplier(islandId) + 0.5)
+
 	node:SetAttribute("BiomeResource", true)
 	node:SetAttribute("IslandId", islandId)
 	node:SetAttribute("ResourceType", canonicalName)
 	node:SetAttribute("SpawnId", spawnId)
 	node:SetAttribute("HarvestHitboxScale", baseScale)
 	node:SetAttribute("VisualScale", visualScale)
-	node:SetAttribute("MaxHealth", HarvestConfig.NodeMaxHealth)
-	node:SetAttribute("Health", HarvestConfig.NodeMaxHealth)
+	node:SetAttribute("MaxHealth", maxHealth)
+	node:SetAttribute("Health", maxHealth)
 	node:SetAttribute("Depleted", false)
 
 	return node

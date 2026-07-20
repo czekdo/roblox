@@ -1,8 +1,5 @@
 local LeaderboardConfig = {}
 
--- Dragon Power is deliberately not included yet: there's no single up-to-date aggregate attribute
--- for "total power across all owned dragons" (DragonPowerScore.Compute is only ever called
--- per-dragon in DragonInventoryService). Add a category here once such an attribute exists.
 LeaderboardConfig.Categories = {
 	{
 		Key = "KingdomLevel",
@@ -18,6 +15,17 @@ LeaderboardConfig.Categories = {
 		IconKey = "Crystal",
 		GetValue = function(player)
 			return player:GetAttribute("LifetimeEssence") or 0
+		end,
+	},
+	{
+		-- Sum of every owned dragon's DragonPowerScore, mirrored onto this attribute by
+		-- DragonInventoryService.BuildInventoryPayload (and refreshed directly after upgrade/sell/
+		-- trade actions that don't otherwise rebuild the full inventory payload).
+		Key = "DragonPower",
+		Name = "Dragon Power",
+		IconKey = "Dragon",
+		GetValue = function(player)
+			return player:GetAttribute("DragonPower") or 0
 		end,
 	},
 }

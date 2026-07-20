@@ -10,7 +10,10 @@ local FADE_TIME = 1.4
 
 local TRACKS = {
 	[ZONE_HUB] = {
-		SoundId = "rbxassetid://1839766217",
+		-- Was rbxassetid://1839766217, which errors with "Asset type does not match
+		-- requested type" (no longer valid audio). Reusing the confirmed-working
+		-- MainIsland track as a placeholder until a proper hub track is chosen.
+		SoundId = "rbxassetid://1841647093",
 		Volume = 0.22,
 	},
 	[ZONE_MAIN_ISLAND] = {

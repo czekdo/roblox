@@ -152,6 +152,13 @@ function TutorialStep.findTargetForStep(playerGui, stepId)
 		return TutorialStep.findByName(playerGui, target.nav)
 	end
 
+	if stepId == "ExplainSellShop" then
+		if TutorialStep.isPanelOpen(playerGui, "SellShopUI", "SellShopPanel") then
+			return nil
+		end
+		return TutorialStep.findByName(playerGui, target.nav)
+	end
+
 	if target.button then
 		local button = TutorialStep.findByName(playerGui, target.button)
 		if button then
@@ -171,6 +178,8 @@ function TutorialStep.shouldAutoCompleteInfo(playerGui, stepId)
 		return TutorialStep.isCodexVisible(playerGui)
 	elseif stepId == "IntroduceAscensionGate" then
 		return TutorialStep.isPanelOpen(playerGui, "RebirthUI", "RebirthPanel")
+	elseif stepId == "ExplainSellShop" then
+		return TutorialStep.isPanelOpen(playerGui, "SellShopUI", "SellShopPanel")
 	end
 	return false
 end

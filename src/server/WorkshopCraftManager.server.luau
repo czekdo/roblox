@@ -5,6 +5,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local WorkshopCraftConfig = require(ReplicatedStorage:WaitForChild("WorkshopCraftConfig"))
 local WorkspaceLayout = require(ReplicatedStorage:WaitForChild("WorkspaceLayout"))
 local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
+local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 local CraftEvents = ReplicatedStorage:WaitForChild("CraftEvents")
 local RequestCraftData = CraftEvents:WaitForChild("RequestCraftData")
 local CraftItem = CraftEvents:WaitForChild("CraftItem")
@@ -58,6 +60,9 @@ RequestCraftData.OnServerInvoke = function(player)
 end
 
 CraftItem.OnServerEvent:Connect(function(player, recipeId)
+	if not RateLimiter.check(player, "CraftItem", 0.3) then
+		return
+	end
 	recipeId = tostring(recipeId or "")
 	local recipe = WorkshopCraftConfig.GetRecipe(recipeId)
 	if not recipe then
@@ -77,7 +82,10 @@ CraftItem.OnServerEvent:Connect(function(player, recipeId)
 		return
 	end
 
-	player:SetAttribute("DragonEssence", essence - recipe.Cost)
+	local found = AdminBridge.call("Harvest", "adjustEssence", player, -recipe.Cost)
+	if not found then
+		player:SetAttribute("DragonEssence", essence - recipe.Cost)
+	end
 	applyReward(player, recipe.Reward)
 	QuestProgressSignal:Fire(player, "CraftItem", 1)
 	sendState(player, "Crafted " .. recipe.DisplayName)

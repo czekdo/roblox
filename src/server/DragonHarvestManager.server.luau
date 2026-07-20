@@ -18,6 +18,7 @@ local IslandUnlockConfig = require(ReplicatedStorage:WaitForChild("IslandUnlockC
 local BiomeResourcePlacer = require(ServerScriptService:WaitForChild("BiomeResourcePlacer"))
 local DragonAIController = require(ServerScriptService:WaitForChild("DragonAIController"))
 local DragonAbilityService = require(ServerScriptService:WaitForChild("DragonAbilityService"))
+local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
 local AscensionBonusService = require(ServerScriptService:WaitForChild("AscensionBonusService"))
 local Events = ReplicatedStorage:WaitForChild("HarvestEvents")
 local TargetNode = Events:WaitForChild("TargetNode")
@@ -195,15 +196,18 @@ local function getRarityStats(rarity)
 	}
 end
 
-local function getDragonStats(level, rarity, evolutionLevel)
+local function getDragonStats(level, rarity, evolutionLevel, dragonType)
 	level = math.max(1, math.floor(tonumber(level) or 1))
 	local safeEvolutionLevel = DragonEggConfig.SanitizeEvolutionLevel(evolutionLevel)
 	local evolutionStats = DragonEggConfig.GetEvolutionStatMultipliers(safeEvolutionLevel)
 	local levelBonus = level - 1
 	local rarityStats = getRarityStats(rarity or "Common")
-	local harvestMultiplier = (rarityStats.Harvest or 1) * (1 + levelBonus * HarvestConfig.DragonHarvestSpeedBonusPerLevel) * evolutionStats.HarvestSpeed
-	local flightSpeed = HarvestConfig.DragonMoveSpeed * (rarityStats.Flight or 1) * (1 + levelBonus * HarvestConfig.DragonMoveSpeedBonusPerLevel) * evolutionStats.FlightSpeed
-	local carryCapacity = math.max(1, math.floor(HarvestConfig.EssencePerHit * (rarityStats.Carry or 1) * (1 + levelBonus * HarvestConfig.DragonCarryCapacityBonusPerLevel) * evolutionStats.CarryCapacity + 0.5))
+	-- Species multiplier: dragons from later islands (and secret pulls) are inherently stronger,
+	-- on top of rarity/level/star bonuses. See DragonEggConfig.SpeciesPowerMultiplier.
+	local speciesMultiplier = DragonEggConfig.GetSpeciesPowerMultiplier(dragonType)
+	local harvestMultiplier = (rarityStats.Harvest or 1) * (1 + levelBonus * HarvestConfig.DragonHarvestSpeedBonusPerLevel) * evolutionStats.HarvestSpeed * speciesMultiplier
+	local flightSpeed = HarvestConfig.DragonMoveSpeed * (rarityStats.Flight or 1) * (1 + levelBonus * HarvestConfig.DragonMoveSpeedBonusPerLevel) * evolutionStats.FlightSpeed * speciesMultiplier
+	local carryCapacity = math.max(1, math.floor(HarvestConfig.EssencePerHit * (rarityStats.Carry or 1) * (1 + levelBonus * HarvestConfig.DragonCarryCapacityBonusPerLevel) * evolutionStats.CarryCapacity * speciesMultiplier + 0.5))
 	local luck = (rarityStats.Luck or HarvestConfig.DragonBaseLuck or 1) * (1 + levelBonus * HarvestConfig.DragonLuckBonusPerLevel) * evolutionStats.Luck
 	local criticalChance = math.clamp((rarityStats.CriticalChance or HarvestConfig.DragonBaseCriticalChance or 0.03) + levelBonus * HarvestConfig.DragonCriticalChanceBonusPerLevel + evolutionStats.CriticalHarvestChance + (luck - 1) * 0.015, 0, 0.9)
 
@@ -219,12 +223,24 @@ local function getDragonStats(level, rarity, evolutionLevel)
 	}
 end
 
-local function getDragonMoveSpeed(level, rarity, evolutionLevel)
-	return getDragonStats(level, rarity, evolutionLevel).FlightSpeed
+local function getDragonMoveSpeed(level, rarity, evolutionLevel, dragonType)
+	return getDragonStats(level, rarity, evolutionLevel, dragonType).FlightSpeed
 end
 
-local function getDragonHarvestRate(level, rarity, evolutionLevel)
-	return getDragonStats(level, rarity, evolutionLevel).HarvestRate
+local function getDragonHarvestRate(level, rarity, evolutionLevel, dragonType)
+	return getDragonStats(level, rarity, evolutionLevel, dragonType).HarvestRate
+end
+
+-- Single source of truth for the rarity-tier glow baseline, shared by applyRarityEffects (initial
+-- spawn) and applyEvolutionVisuals (every level-up/merge afterward) so the two never disagree and
+-- a level-up can't quietly wipe out the glow a high-rarity dragon was spawned with.
+local function getRarityGlowBase(rarity)
+	if rarity == "Legendary" or rarity == "Mythic" or rarity == "Ancient" then
+		return 3.5, 14
+	elseif rarity == "Epic" then
+		return 2.0, 10
+	end
+	return 0.3, 5
 end
 
 local function applyEvolutionVisuals(dragon)
@@ -253,8 +269,12 @@ local function applyEvolutionVisuals(dragon)
 	end
 	if glow:IsA("PointLight") then
 		glow.Color = rarityInfo.Color
-		glow.Brightness = 0.25 + evolutionLevel * 0.45 * visualMultipliers.GlowBrightness
-		glow.Range = 5 + evolutionLevel * 2 * visualMultipliers.GlowRange
+		-- Base brightness/range comes from rarity (see getRarityGlowBase - the same baseline
+		-- applyRarityEffects sets at spawn), so a level-up or merge doesn't wipe out the "this is
+		-- a good pull" glow a high-rarity dragon already had; evolution stars add on top of it.
+		local rarityBrightness, rarityRange = getRarityGlowBase(dragon.rarity or "Common")
+		glow.Brightness = rarityBrightness + evolutionLevel * 0.45 * visualMultipliers.GlowBrightness
+		glow.Range = rarityRange + evolutionLevel * 2 * visualMultipliers.GlowRange
 	end
 
 	local aura = root:FindFirstChild("EvolutionAura")
@@ -320,7 +340,7 @@ end
 local function applyDragonLevelAttributes(dragon)
 	local level = math.max(1, dragon.level or 1)
 	local evolutionLevel = DragonEggConfig.SanitizeEvolutionLevel(dragon.evolutionLevel)
-	local stats = getDragonStats(level, dragon.rarity, evolutionLevel)
+	local stats = getDragonStats(level, dragon.rarity, evolutionLevel, dragon.dragonType)
 	local mergeCost = DragonEggConfig.GetEvolutionMergeCost(evolutionLevel)
 	local stars = DragonEggConfig.GetEvolutionStars(evolutionLevel)
 	dragon.model:SetAttribute("DragonLevel", level)
@@ -666,7 +686,8 @@ local function applyRarityEffects(clone, rarity, scaleFactor)
 
 	local effectScale = scaleFactor / HarvestConfig.BaseDragonScale
 	local bodySize = body.Size
-	createRarityLight(body, rarityInfo, 0.25, 4 * effectScale)
+	local rarityBrightness, rarityRange = getRarityGlowBase(rarity)
+	createRarityLight(body, rarityInfo, rarityBrightness, rarityRange * effectScale)
 
 	if rarity == "Rare" then
 		createRarityParticle(
@@ -674,11 +695,11 @@ local function applyRarityEffects(clone, rarity, scaleFactor)
 			"RarityMist",
 			rarityInfo,
 			effectScale,
-			4,
+			6,
 			NumberRange.new(0.8, 1.2),
 			NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 0.25 * effectScale),
-				NumberSequenceKeypoint.new(1, 0.6 * effectScale),
+				NumberSequenceKeypoint.new(0, 0.6 * effectScale),
+				NumberSequenceKeypoint.new(1, 1.3 * effectScale),
 			})
 		)
 	end
@@ -695,10 +716,10 @@ local function applyRarityEffects(clone, rarity, scaleFactor)
 			NumberSequenceKeypoint.new(0, 0.35),
 			NumberSequenceKeypoint.new(1, 1),
 		})
-		trail.Lifetime = 0.45
+		trail.Lifetime = 0.55
 		trail.MinLength = 0.2
 		trail.WidthScale = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.55 * effectScale),
+			NumberSequenceKeypoint.new(0, 0.9 * effectScale),
 			NumberSequenceKeypoint.new(1, 0),
 		})
 		trail.LightEmission = 0.75
@@ -707,22 +728,16 @@ local function applyRarityEffects(clone, rarity, scaleFactor)
 	end
 
 	if rarity == "Epic" or rarity == "Legendary" or rarity == "Mythic" or rarity == "Ancient" then
-		local light = body:FindFirstChild("RarityGlow")
-		if light and light:IsA("PointLight") then
-			light.Brightness = 0.9
-			light.Range = 8 * effectScale
-		end
-
 		local aura = createRarityParticle(
 			body,
 			"RarityAura",
 			rarityInfo,
 			effectScale,
-			6,
-			NumberRange.new(0.7, 1.1),
+			10,
+			NumberRange.new(0.8, 1.3),
 			NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 0.45 * effectScale),
-				NumberSequenceKeypoint.new(1, 1.2 * effectScale),
+				NumberSequenceKeypoint.new(0, 1.0 * effectScale),
+				NumberSequenceKeypoint.new(1, 2.2 * effectScale),
 			})
 		)
 		aura.Speed = NumberRange.new(0.2 * effectScale, 0.8 * effectScale)
@@ -730,22 +745,16 @@ local function applyRarityEffects(clone, rarity, scaleFactor)
 	end
 
 	if rarity == "Legendary" or rarity == "Mythic" or rarity == "Ancient" then
-		local light = body:FindFirstChild("RarityGlow")
-		if light and light:IsA("PointLight") then
-			light.Brightness = 1.5
-			light.Range = 11 * effectScale
-		end
-
 		local sparkles = createRarityParticle(
 			body,
 			"RaritySparkles",
 			rarityInfo,
 			effectScale,
-			10,
-			NumberRange.new(0.35, 0.7),
+			18,
+			NumberRange.new(0.4, 0.8),
 			NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 0.12 * effectScale),
-				NumberSequenceKeypoint.new(0.5, 0.22 * effectScale),
+				NumberSequenceKeypoint.new(0, 0.35 * effectScale),
+				NumberSequenceKeypoint.new(0.5, 0.55 * effectScale),
 				NumberSequenceKeypoint.new(1, 0),
 			})
 		)
@@ -1735,7 +1744,7 @@ local function getActiveBoostMultiplier(player, boostId)
 end
 
 local function performHarvestHit(player, dragon, node)
-	local stats = getDragonStats(dragon.level, dragon.rarity, dragon.evolutionLevel)
+	local stats = getDragonStats(dragon.level, dragon.rarity, dragon.evolutionLevel, dragon.dragonType)
 	local baseAmount = stats.CarryCapacity
 	local isCritical = math.random() < stats.CriticalHarvestChance
 	local harvestAmount = isCritical and math.floor(baseAmount * stats.CriticalMultiplier + 0.5) or baseAmount
@@ -1827,7 +1836,7 @@ local function updateDragon(player, dragon, dt)
 			local lookAt = CFrame.lookAt(dragon.position, Vector3.new(targetPos.X, dragon.position.Y, targetPos.Z))
 			dragon.model:SetAttribute("LookDirection", lookAt.LookVector)
 		else
-			local step = math.min(getDragonMoveSpeed(dragon.level, dragon.rarity, dragon.evolutionLevel) * dt, distance)
+			local step = math.min(getDragonMoveSpeed(dragon.level, dragon.rarity, dragon.evolutionLevel, dragon.dragonType) * dt, distance)
 			if distance > 0.01 then
 				dragon.position += offset.Unit * step
 			end
@@ -1851,7 +1860,7 @@ local function updateDragon(player, dragon, dt)
 		dragon.model:SetAttribute("LookDirection", lookAt.LookVector)
 		local harvestSpeedBoost = getActiveBoostMultiplier(player, "CraftHarvestBoost")
 			* getActiveBoostMultiplier(player, "DailyWheelHarvestBoost")
-		if dragon.harvestTimer >= getDragonHarvestRate(dragon.level, dragon.rarity, dragon.evolutionLevel) / harvestSpeedBoost then
+		if dragon.harvestTimer >= getDragonHarvestRate(dragon.level, dragon.rarity, dragon.evolutionLevel, dragon.dragonType) / harvestSpeedBoost then
 			dragon.harvestTimer = 0
 			performHarvestHit(player, dragon, node)
 			if dragon.state == "harvesting" and (node:GetAttribute("Health") or 0) > 0 then
@@ -2020,6 +2029,9 @@ RequestDragonMergeData.OnServerInvoke = function(player)
 end
 
 MergeDragons.OnServerEvent:Connect(function(player, dragonIds)
+	if not RateLimiter.check(player, "MergeDragons", 0.3) then
+		return
+	end
 	mergeDragons(player, dragonIds)
 end)
 
@@ -2081,6 +2093,9 @@ local function getEggSpawnPosition(player)
 end
 
 BuyDragonEgg.OnServerEvent:Connect(function(player, eggType)
+	if not RateLimiter.check(player, "BuyDragonEgg", 0.3) then
+		return
+	end
 	eggType = DragonEggConfig.IsValidEggType(eggType) and eggType or "Common"
 	local position = getEggSpawnPosition(player)
 	if not position then
@@ -2091,6 +2106,9 @@ BuyDragonEgg.OnServerEvent:Connect(function(player, eggType)
 end)
 
 EggHatchComplete.OnServerEvent:Connect(function(player, hatchId)
+	if not RateLimiter.check(player, "EggHatchComplete", 0.3) then
+		return
+	end
 	if typeof(hatchId) ~= "string" then
 		return
 	end
@@ -2113,6 +2131,9 @@ GrantTutorialRewardEgg.Event:Connect(function(player, eggType)
 end)
 
 UpgradeDragon.OnServerEvent:Connect(function(player, dragonModel)
+	if not RateLimiter.check(player, "UpgradeDragon", 0.3) then
+		return
+	end
 	if typeof(dragonModel) ~= "Instance" or not dragonModel:IsDescendantOf(dragonsFolder) then
 		return
 	end
@@ -2133,6 +2154,11 @@ UpgradeDragon.OnServerEvent:Connect(function(player, dragonModel)
 	end
 
 	local level = math.max(1, selectedDragon.level or 1)
+	local maxLevel = DragonTrainingConfig.MaxDragonLevel or 50
+	if level >= maxLevel then
+		UpgradeDragon:FireClient(player, false, dragonModel, level, math.huge, data.essence)
+		return
+	end
 	local cost = getDragonUpgradeCost(level)
 	if data.essence < cost then
 		UpgradeDragon:FireClient(player, false, dragonModel, level, cost, data.essence)
@@ -2149,6 +2175,7 @@ UpgradeDragon.OnServerEvent:Connect(function(player, dragonModel)
 	end
 	applyDragonLevelAttributes(selectedDragon)
 	sendUIUpdate(player)
+	player:SetAttribute("DragonPower", math.floor(DragonInventoryService.ComputeTotalPower(player, data)))
 	saveDragonLevels(player)
 	AchievementProgressSignal:Fire(player, "DragonLevelUp", 0, { level = selectedDragon.level })
 	UpgradeDragon:FireClient(player, true, dragonModel, selectedDragon.level, getDragonUpgradeCost(selectedDragon.level), data.essence)
@@ -2734,6 +2761,7 @@ AdminBridge.register("Trading", {
 		data.ownedDragonCount = math.max(0, (data.ownedDragonCount or 1) - 1)
 		saveDragonLevels(player)
 		sendUIUpdate(player)
+		player:SetAttribute("DragonPower", math.floor(DragonInventoryService.ComputeTotalPower(player, data)))
 		return true
 	end,
 	grantStorageDragon = function(player, snapshot)
@@ -2747,6 +2775,7 @@ AdminBridge.register("Trading", {
 		})
 		saveDragonLevels(player)
 		sendUIUpdate(player)
+		player:SetAttribute("DragonPower", math.floor(DragonInventoryService.ComputeTotalPower(player, data)))
 		return true
 	end,
 })

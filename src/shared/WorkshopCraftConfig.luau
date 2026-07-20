@@ -11,10 +11,13 @@ local WorkshopCraftConfig = {
 		{
 			Id = "DragonSnack",
 			DisplayName = "Dragon Snack",
-			Description = "Instantly grants 150 Dragon Essence.",
+			Description = "Instantly grants 40 Dragon Essence.",
 			Tier = 1,
 			Cost = 100,
-			Reward = { Type = "DragonEssence", Amount = 150, Text = "+150 Dragon Essence" },
+			-- Was Amount = 150 - a strictly profitable craft loop (100 cost, 150 back, infinitely
+			-- repeatable). Every other DragonEssence-reward recipe returns ~35-50% of its cost as a
+			-- minor essence sink; matching that here instead of a free-money exploit.
+			Reward = { Type = "DragonEssence", Amount = 40, Text = "+40 Dragon Essence" },
 		},
 		{
 			Id = "RareEggFragment",
