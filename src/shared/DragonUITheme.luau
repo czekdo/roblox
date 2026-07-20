@@ -446,8 +446,46 @@ function Theme.createPanel(props)
 	Theme.addDecorativeCorners(panel, 4)
 	local scale = Instance.new("UIScale")
 	scale.Name = "PanelScale"
-	scale.Scale = props.Scale or Theme.MobileScale
 	scale.Parent = panel
+
+	-- Base (pre-scale) size, measured via AbsoluteSize rather than parsed from the Size UDim2, so
+	-- this works whether a caller's Size is offset-based (the norm) or scale-based.
+	local baseWidth, baseHeight = panel.AbsoluteSize.X, panel.AbsoluteSize.Y
+	local requestedScale = props.Scale or Theme.MobileScale
+
+	-- On phones/small viewports a panel sized for desktop can be taller/wider than the actual
+	-- screen even after the constant MobileScale shrink (e.g. a 560-tall panel at 0.88 is still
+	-- 493px - taller than many phones in landscape), clipping content top and bottom with no way
+	-- to scroll to it. Clamp the scale further so the panel never exceeds the safe viewport.
+	local function fitScale()
+		local camera = workspace.CurrentCamera
+		if not camera or baseWidth <= 0 or baseHeight <= 0 then
+			return requestedScale
+		end
+		local edge = (Theme.SafeArea and Theme.SafeArea.Edge or 12) * 2
+		local availW = math.max(1, camera.ViewportSize.X - edge)
+		local availH = math.max(1, camera.ViewportSize.Y - edge)
+		return math.min(requestedScale, availW / baseWidth, availH / baseHeight)
+	end
+
+	scale.Scale = fitScale()
+	panel:SetAttribute("TargetScale", scale.Scale)
+	local camera = workspace.CurrentCamera
+	if camera then
+		local conn = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+			if panel.Parent then
+				local newScale = fitScale()
+				scale.Scale = newScale
+				panel:SetAttribute("TargetScale", newScale)
+			end
+		end)
+		panel.AncestryChanged:Connect(function()
+			if not panel.Parent then
+				conn:Disconnect()
+			end
+		end)
+	end
+
 	Theme.addCrystalShine(panel)
 	return panel, scale
 end
@@ -1054,13 +1092,17 @@ function Theme.tweenOpen(panel, dim)
 	panel.Position = closedPos
 	panel.BackgroundTransparency = 0.2
 	local panelScale = panel:FindFirstChild("PanelScale")
-	if panelScale and panelScale:IsA("UIScale") then panelScale.Scale = (Theme.MobileScale or 1) * 0.94 end
+	-- TargetScale (set by createPanel) is MobileScale further clamped to fit the current viewport;
+	-- using the raw MobileScale constant here would override that clamp and re-introduce clipping
+	-- on small screens the instant a panel opens.
+	local targetScale = panel:GetAttribute("TargetScale") or Theme.MobileScale or 1
+	if panelScale and panelScale:IsA("UIScale") then panelScale.Scale = targetScale * 0.94 end
 	TweenService:Create(panel, TweenInfo.new(0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		Position = openPos, BackgroundTransparency = 0,
 	}):Play()
 	if panelScale and panelScale:IsA("UIScale") then
 		TweenService:Create(panelScale, TweenInfo.new(0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Scale = Theme.MobileScale or 1,
+			Scale = targetScale,
 		}):Play()
 	end
 end

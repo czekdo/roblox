@@ -52,20 +52,49 @@ local topBar = Theme.createFrame({
 })
 Theme.makeInputTransparent(topBar)
 
+-- TopBar itself never shrinks (it's the stable "available width" reference for autoFitTopBar
+-- below). TopBarInner holds the actual row + a UIScale, so on narrow/phone viewports the whole
+-- row can shrink to fit instead of the leftmost (Kingdom capsule) and rightmost (last icons)
+-- elements silently rendering off-screen when the row's natural width exceeds the viewport.
+local topBarInner = Theme.createFrame({
+	Name = "TopBarInner", Parent = topBar, Size = UDim2.fromScale(1, 1), BgTransparency = 1,
+})
+Theme.makeInputTransparent(topBarInner)
+local topBarScale = Instance.new("UIScale")
+topBarScale.Name = "TopBarScale"
+topBarScale.Parent = topBarInner
+
 local barLayout = Instance.new("UIListLayout")
 barLayout.FillDirection = Enum.FillDirection.Horizontal
-barLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+-- Left (not Center): UIListLayout computes centering from each child's declared (pre-UIScale)
+-- size, so combined with the dynamic TopBarScale above, Center alignment made the row visibly
+-- drift off-screen to the left instead of converging on a centered fit. Left-aligned, the row
+-- simply starts at TopBarInner's edge and scales down cleanly with no centering math involved.
+barLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 barLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 barLayout.Padding = UDim.new(0, 10)
 barLayout.SortOrder = Enum.SortOrder.LayoutOrder
-barLayout.Parent = topBar
+barLayout.Parent = topBarInner
+
+local function autoFitTopBar()
+	local naturalWidth = barLayout.AbsoluteContentSize.X / topBarScale.Scale
+	if naturalWidth <= 0 then
+		return
+	end
+	local newScale = math.clamp(topBar.AbsoluteSize.X / naturalWidth, 0.001, 1)
+	if math.abs(newScale - topBarScale.Scale) > 0.001 then
+		topBarScale.Scale = newScale
+	end
+end
+barLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(autoFitTopBar)
+topBar:GetPropertyChangedSignal("AbsoluteSize"):Connect(autoFitTopBar)
 
 local kingdomCapsule
-kingdomCapsule, kingdomNameLabel, levelLabel, xpFill = Theme.createKingdomCapsule(topBar)
+kingdomCapsule, kingdomNameLabel, levelLabel, xpFill = Theme.createKingdomCapsule(topBarInner)
 kingdomCapsule.LayoutOrder = 1
 
 local centerWrap = Theme.createFrame({
-	Name = "Resources", Parent = topBar, Size = UDim2.fromOffset(0, 48),
+	Name = "Resources", Parent = topBarInner, Size = UDim2.fromOffset(0, 48),
 	BgTransparency = 1, LayoutOrder = 2,
 })
 centerWrap.AutomaticSize = Enum.AutomaticSize.X
@@ -91,7 +120,7 @@ capacityLabel = capVal
 capacityLabel.Text = "0 / " .. tostring(HarvestConfig.MaxDragons)
 
 local rightWrap = Theme.createFrame({
-	Name = "RightWrap", Parent = topBar, Size = UDim2.fromOffset(0, 48),
+	Name = "RightWrap", Parent = topBarInner, Size = UDim2.fromOffset(0, 48),
 	BgTransparency = 1, LayoutOrder = 3,
 })
 rightWrap.AutomaticSize = Enum.AutomaticSize.X
@@ -195,10 +224,12 @@ Theme.createIconButton({
 })
 Theme.createIconButton({
 	Name = "SellShopButton", Parent = rightWrap, Size = UDim2.fromOffset(44, 44),
-	Bg = Theme.Colors.TopBarCapsule, Image = Theme.Icons.Diamond, LayoutOrder = 8,
+	Bg = Theme.Colors.TopBarCapsule, Image = Theme.Icons.Backpack, LayoutOrder = 8,
 	Stroke = true, StrokeColor = Theme.Colors.Gold, StrokeTransparency = 0.2,
 	OnClick = function() if _G.DragonIslandOpenSellShop then _G.DragonIslandOpenSellShop() end end,
 })
+
+autoFitTopBar()
 
 local function refreshKingdomStatus()
 	kingdomNameLabel.Text = string.upper(getKingdomName())
