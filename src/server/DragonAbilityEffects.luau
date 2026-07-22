@@ -128,6 +128,21 @@ function Handlers.NaturesBlessing(_player, _dragon, _node, hitData, params)
 	}
 end
 
+function Handlers.RoyalBlessing(_player, _dragon, _node, hitData, params)
+	local procChance = math.clamp(tonumber(params.ProcChance) or 0, 0, 1)
+	if math.random() >= procChance then
+		return {}
+	end
+	local bonusEssence = essenceFromPercent(hitData.harvestAmount, params.FavorPercent)
+	if bonusEssence <= 0 then
+		return {}
+	end
+	return {
+		bonusEssence = bonusEssence,
+		vfxTag = "RoyalBlessing",
+	}
+end
+
 function Handlers.VoidRift(_player, _dragon, _node, hitData, params)
 	local procChance = math.clamp(tonumber(params.ProcChance) or 0, 0, 1)
 	if math.random() >= procChance then

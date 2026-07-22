@@ -168,6 +168,27 @@ DragonEggConfig.EggTypes = {
 			{ Name = "CelestialDragon", DisplayName = "Celestial Dragon", ModelName = "CelestialDragon", Weight = 1 },
 		},
 	},
+	Gem = {
+		Id = "Gem",
+		DisplayName = "Gem Egg",
+		GemCost = 25,
+		Description = "Bought with Gems, not Essence. Hatches any known dragon species - including ones from islands you haven't unlocked yet - with better odds at a Secret Dragon.",
+		RarityColor = Color3.fromRGB(255, 120, 220),
+		EggColor = Color3.fromRGB(200, 90, 220),
+		SpotColor = Color3.fromRGB(255, 200, 250),
+		GlowColor = Color3.fromRGB(255, 130, 230),
+		Icon = "rbxassetid://78918235954057",
+		Dragons = {
+			{ Name = "ForestDragon", DisplayName = "Forest Dragon", ModelName = "ForestDragon", Weight = 1 },
+			{ Name = "IceDragon", DisplayName = "Ice Dragon", ModelName = "IceDragon", Weight = 1 },
+			{ Name = "FireDragon", DisplayName = "Fire Dragon", ModelName = "FireDragon", Weight = 1 },
+			{ Name = "LavaDragon", DisplayName = "Lava Dragon", ModelName = "LavaDragon", Weight = 1 },
+			{ Name = "StormDragon", DisplayName = "Storm Dragon", ModelName = "StormDragon", Weight = 1 },
+			{ Name = "VoidDragon", DisplayName = "Void Dragon", ModelName = "VoidDragon", Weight = 1 },
+			{ Name = "CrystalDragon", DisplayName = "Crystal Dragon", ModelName = "CrystalDragon", Weight = 1 },
+			{ Name = "CelestialDragon", DisplayName = "Celestial Dragon", ModelName = "CelestialDragon", Weight = 1 },
+		},
+	},
 	Ancient = {
 		Id = "Ancient",
 		DisplayName = "Ancient Egg",
@@ -211,6 +232,27 @@ for _, eggId in SECRET_DRAGON_EGGS do
 	end
 end
 
+-- The Gem Egg gets a boosted (not just the uniform SECRET_DRAGON_CHANCE) shot at a Secret Dragon,
+-- since it's bought with Gems rather than earned/ground-out Essence - a premium egg should feel
+-- like better luck, not just more convenient species access.
+local GEM_EGG_SECRET_CHANCE = 0.02
+do
+	local eggInfo = DragonEggConfig.EggTypes.Gem
+	local normalWeight = 0
+	for _, dragon in eggInfo.Dragons do
+		normalWeight += dragon.Weight or 1
+	end
+	local secretWeight = normalWeight * GEM_EGG_SECRET_CHANCE
+	for _, secret in SECRET_DRAGONS do
+		table.insert(eggInfo.Dragons, {
+			Name = secret.Name,
+			DisplayName = secret.DisplayName,
+			ModelName = secret.ModelName,
+			Weight = secretWeight,
+		})
+	end
+end
+
 -- Base combat/harvest power multiplier per species, applied in getDragonStats on top of rarity,
 -- level, and evolution (star) bonuses. Escalates with island unlock order, so a dragon from a
 -- later island is inherently stronger than one from an earlier island at the same level/rarity/
@@ -228,6 +270,9 @@ DragonEggConfig.SpeciesPowerMultiplier = {
 	CelestialDragon = 2.5,
 	PoisonDragon = 5.0,
 	CoralOceanDragon = 5.0,
+	-- VIP Pass exclusive - deliberately below Celestial (2.5) and well below the secret dragons
+	-- (5.0), so it's a nice paid shortcut/cosmetic flex, not the strongest dragon in the game.
+	VipDragon = 2.2,
 }
 
 function DragonEggConfig.GetSpeciesPowerMultiplier(dragonType)
@@ -260,7 +305,7 @@ end
 
 -- Order matches island unlock progression (Forest, Cold, Lava, Storm, Shadow, Crystal, Celestial),
 -- with Fire (not island-gated) placed right after the first two, and Ancient (reserved) last.
-DragonEggConfig.EggOrder = { "Common", "Forest", "Ice", "Fire", "Lava", "Storm", "Shadow", "Crystal", "Celestial", "Ancient" }
+DragonEggConfig.EggOrder = { "Common", "Forest", "Ice", "Fire", "Lava", "Storm", "Shadow", "Crystal", "Celestial", "Gem", "Ancient" }
 DragonEggConfig.RewardEggOrder = { "Common", "Rare", "Forest", "Ice", "Fire", "Lava", "Storm", "Shadow", "Crystal", "Celestial", "Ancient" }
 
 DragonEggConfig.EggCost = DragonEggConfig.EggTypes.Common.Cost
@@ -275,6 +320,7 @@ DragonEggConfig.DragonTypes = {
 	"CelestialDragon",
 	"PoisonDragon",
 	"CoralOceanDragon",
+	"VipDragon",
 }
 
 DragonEggConfig.Evolution = {
@@ -356,6 +402,12 @@ function DragonEggConfig.GetRarityDropChances()
 	return chances
 end
 
+-- Display names for dragons not obtained through any egg (so GetDragonEntry below has nothing to
+-- find) - currently just the VIP Pass exclusive.
+local SPECIAL_DRAGON_DISPLAY_NAMES = {
+	VipDragon = "Royal Dragon",
+}
+
 function DragonEggConfig.GetDragonEntry(dragonType)
 	for _, eggType in DragonEggConfig.EggOrder do
 		local eggInfo = DragonEggConfig.EggTypes[eggType]
@@ -370,7 +422,7 @@ end
 
 function DragonEggConfig.GetDragonDisplayName(dragonType)
 	local entry = DragonEggConfig.GetDragonEntry(dragonType)
-	return entry and entry.DisplayName or dragonType
+	return (entry and entry.DisplayName) or SPECIAL_DRAGON_DISPLAY_NAMES[dragonType] or dragonType
 end
 
 function DragonEggConfig.GetDragonModelName(dragonType)

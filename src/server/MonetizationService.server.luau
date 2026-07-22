@@ -6,6 +6,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local MonetizationConfig = require(ReplicatedStorage:WaitForChild("MonetizationConfig"))
 local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
+local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 
 -- ============================================================
 -- Developer products (Gems packs, etc.) — ProcessReceipt
@@ -81,6 +82,54 @@ end
 MarketplaceService.ProcessReceipt = processReceipt
 
 -- ============================================================
+-- VIP Pass exclusive dragon — granted once, ever, per player.
+-- ============================================================
+-- Same idempotent-grant pattern as processReceipt above, but keyed by UserId instead of
+-- PurchaseId (a GamePass is a single permanent ownership flag, not a repeatable receipt). Tracked
+-- in its own DataStore rather than "grant if not currently in storage/roster", so selling the
+-- dragon doesn't let a VIP owner farm infinite essence by selling and rejoining.
+
+local vipDragonGrantStore = nil
+if game.GameId ~= 0 then
+	local success, result = pcall(function()
+		return DataStoreService:GetDataStore("DragonIslandVipDragonGrantV1")
+	end)
+	if success then
+		vipDragonGrantStore = result
+	else
+		warn("[MonetizationService] VIP dragon grant DataStore unavailable:", result)
+	end
+end
+
+local function grantVipDragonOnce(player)
+	if not player:GetAttribute("OwnsVIP") or not vipDragonGrantStore then
+		return
+	end
+	local success, result = pcall(function()
+		return vipDragonGrantStore:UpdateAsync(tostring(player.UserId), function(isGranted)
+			if isGranted then
+				return true
+			end
+			local grantOk = pcall(function()
+				AdminBridge.call("Trading", "grantStorageDragon", player, {
+					dragonType = "VipDragon",
+					rarity = "Epic",
+					level = 1,
+					evolutionLevel = 0,
+				})
+			end)
+			if not grantOk then
+				return nil
+			end
+			return true
+		end)
+	end)
+	if not success then
+		warn("[MonetizationService] Failed to process VIP dragon grant for", player.Name, result)
+	end
+end
+
+-- ============================================================
 -- Game passes — ownership cached as a player attribute so other
 -- systems can read it cheaply (player:GetAttribute(pass.AttributeName)).
 -- ============================================================
@@ -93,6 +142,9 @@ local function refreshGamePassOwnership(player)
 			end)
 			if ok then
 				player:SetAttribute(pass.AttributeName, owns)
+				if pass.Key == "VIP" and owns then
+					grantVipDragonOnce(player)
+				end
 			else
 				warn("[MonetizationService] Failed to check GamePass ownership for", player.Name, pass.Key, owns)
 			end
@@ -114,9 +166,20 @@ MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gameP
 	for _, pass in MonetizationConfig.GamePasses do
 		if pass.Id == gamePassId then
 			player:SetAttribute(pass.AttributeName, true)
+			if pass.Key == "VIP" then
+				grantVipDragonOnce(player)
+			end
 			break
 		end
 	end
 end)
+
+AdminBridge.register("Monetization", {
+	grantVip = function(player)
+		player:SetAttribute("OwnsVIP", true)
+		grantVipDragonOnce(player)
+		return "VIP granted"
+	end,
+})
 
 print("[MonetizationService] Monetization scaffolding ready (placeholder IDs - fill in real GamePass/DeveloperProduct IDs in MonetizationConfig.luau)")

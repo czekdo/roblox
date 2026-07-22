@@ -60,6 +60,18 @@ DragonAbilityConfig.Species = {
 			{ ProcChance = 0.09, RiftPercent = 0.95 },
 		},
 	},
+	VipDragon = {
+		AbilityName = "Royal Blessing",
+		Description = "Each harvest has a chance to call royal favor for bonus essence.",
+		HandlerId = "RoyalBlessing",
+		Levels = {
+			{ ProcChance = 0.06, FavorPercent = 0.65 },
+			{ ProcChance = 0.07, FavorPercent = 0.72 },
+			{ ProcChance = 0.08, FavorPercent = 0.80 },
+			{ ProcChance = 0.09, FavorPercent = 0.88 },
+			{ ProcChance = 0.10, FavorPercent = 1.00 },
+		},
+	},
 	CelestialDragon = {
 		AbilityName = "Starfall Blessing",
 		Description = "Each harvest has a chance to call down a star for a big essence bonus.",
@@ -157,10 +169,20 @@ function DragonAbilityConfig.GetSpeciesConfig(speciesId)
 	return DragonAbilityConfig.Species[speciesId]
 end
 
+-- Species granted directly (not hatched from an egg) never fire the achievement system's
+-- "HatchDragon" discovery signal, so including them in the enumerated species list would make
+-- Codex completion and the "Codex Master" achievement permanently unachievable (a permanent "???"
+-- entry nothing can ever unlock). Excluded here; GetSpeciesConfig("VipDragon") still resolves its
+-- ability data directly for the Roster's own detail/ability display, which doesn't go through
+-- this enumeration.
+local NOT_DISCOVERABLE_VIA_HATCHING = { VipDragon = true }
+
 function DragonAbilityConfig.GetAllSpeciesIds()
 	local ids = {}
 	for speciesId in DragonAbilityConfig.Species do
-		table.insert(ids, speciesId)
+		if not NOT_DISCOVERABLE_VIA_HATCHING[speciesId] then
+			table.insert(ids, speciesId)
+		end
 	end
 	table.sort(ids)
 	return ids
@@ -246,6 +268,8 @@ function DragonAbilityConfig.FormatAbilityValue(speciesId, abilityLevel)
 		return formatPercent(params.ProcChance) .. " chance for +" .. formatPercent(params.RiftPercent) .. " essence"
 	elseif handlerId == "Starfall" then
 		return formatPercent(params.ProcChance) .. " chance for +" .. formatPercent(params.StarfallPercent) .. " essence"
+	elseif handlerId == "RoyalBlessing" then
+		return formatPercent(params.ProcChance) .. " chance for +" .. formatPercent(params.FavorPercent) .. " essence"
 	end
 	return config.AbilityName
 end
