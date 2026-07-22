@@ -1351,9 +1351,17 @@ local function createEgg(player, position, eggType, options)
 			return
 		end
 	end
-	if not options.rewardGranted and data.essence < eggInfo.Cost then
-		sendEggShopUpdate(player, "Need " .. tostring(eggInfo.Cost) .. " Dragon Essence")
-		return
+	local isGemEgg = eggInfo.GemCost ~= nil
+	if not options.rewardGranted then
+		if isGemEgg then
+			if (player:GetAttribute("PremiumGems") or 0) < eggInfo.GemCost then
+				sendEggShopUpdate(player, "Need " .. tostring(eggInfo.GemCost) .. " Gems")
+				return
+			end
+		elseif data.essence < eggInfo.Cost then
+			sendEggShopUpdate(player, "Need " .. tostring(eggInfo.Cost) .. " Dragon Essence")
+			return
+		end
 	end
 	if #data.eggs >= 1 then
 		sendEggShopUpdate(player, "Finish hatching your current egg first")
@@ -1369,7 +1377,11 @@ local function createEgg(player, position, eggType, options)
 	end
 
 	if not options.rewardGranted then
-		data.essence -= eggInfo.Cost
+		if isGemEgg then
+			player:SetAttribute("PremiumGems", (player:GetAttribute("PremiumGems") or 0) - eggInfo.GemCost)
+		else
+			data.essence -= eggInfo.Cost
+		end
 	end
 	local stats = sanitizeEggStats(data.eggStats)
 	stats.OwnedEggs[eggType] = (stats.OwnedEggs[eggType] or 0) + 1
@@ -1384,7 +1396,11 @@ local function createEgg(player, position, eggType, options)
 	local eggModel = DragonEggFactory.Create(eggType, eggInfo)
 	if not eggModel then
 		if not options.rewardGranted then
-			data.essence += eggInfo.Cost
+			if isGemEgg then
+				player:SetAttribute("PremiumGems", (player:GetAttribute("PremiumGems") or 0) + eggInfo.GemCost)
+			else
+				data.essence += eggInfo.Cost
+			end
 		end
 		stats.OwnedEggs[eggType] = math.max(0, (stats.OwnedEggs[eggType] or 0) - 1)
 		stats.Purchases[eggType] = math.max(0, (stats.Purchases[eggType] or 0) - 1)

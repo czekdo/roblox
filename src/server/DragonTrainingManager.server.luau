@@ -12,6 +12,7 @@ local RequestDragonTrainingData = HarvestEvents:WaitForChild("RequestDragonTrain
 local StartDragonTraining = HarvestEvents:WaitForChild("StartDragonTraining")
 local ClaimDragonTraining = HarvestEvents:WaitForChild("ClaimDragonTraining")
 local CancelDragonTraining = HarvestEvents:WaitForChild("CancelDragonTraining")
+local SkipDragonTraining = HarvestEvents:WaitForChild("SkipDragonTraining")
 local DragonTrainingUpdate = HarvestEvents:WaitForChild("DragonTrainingUpdate")
 local QuestEvents = ReplicatedStorage:WaitForChild("QuestEvents")
 local QuestProgressSignal = QuestEvents:WaitForChild("QuestProgressSignal")
@@ -106,6 +107,17 @@ local function isSessionComplete(session)
 	return session and not session.claimed and getServerNow() >= session.endsAt
 end
 
+-- Gems sink: pay to instantly finish an in-progress session instead of waiting. Priced off
+-- remaining time (not total duration) so skipping a session that's almost done costs almost
+-- nothing, and skipping right after starting costs close to the full price.
+local SKIP_GEMS_PER_MINUTE = 2
+local SKIP_MIN_COST = 5
+
+local function getSkipCost(session)
+	local remaining = math.max(0, session.endsAt - getServerNow())
+	return math.max(SKIP_MIN_COST, math.ceil(remaining / 60 * SKIP_GEMS_PER_MINUTE))
+end
+
 local function buildProgramPayload(player, programId)
 	local program = DragonTrainingConfig.GetProgram(programId)
 	if not program then
@@ -155,6 +167,7 @@ local function buildPayload(player, message)
 			complete = isSessionComplete(session),
 			levelReward = session.levelReward,
 			essenceReward = session.essenceReward,
+			skipCost = isSessionComplete(session) and 0 or getSkipCost(session),
 			dragon = dragonEntry,
 		})
 	end
@@ -327,6 +340,27 @@ local function claimTraining(player, sessionId)
 	end
 end
 
+local function skipTraining(player, sessionId)
+	local session = findSession(player, tostring(sessionId or ""))
+	if not session or session.claimed then
+		sendUpdate(player, "Training session not found")
+		return
+	end
+	if isSessionComplete(session) then
+		sendUpdate(player, "Training is already complete - claim your rewards!")
+		return
+	end
+	local cost = getSkipCost(session)
+	local gems = player:GetAttribute("PremiumGems") or 0
+	if gems < cost then
+		sendUpdate(player, "Need " .. tostring(cost) .. " Gems to skip")
+		return
+	end
+	player:SetAttribute("PremiumGems", gems - cost)
+	session.endsAt = getServerNow()
+	claimTraining(player, session.id)
+end
+
 local function cancelTraining(player, sessionId)
 	local session = findSession(player, tostring(sessionId or ""))
 	if not session or session.claimed then
@@ -364,6 +398,13 @@ end)
 
 CancelDragonTraining.OnServerEvent:Connect(function(player, sessionId)
 	cancelTraining(player, sessionId)
+end)
+
+SkipDragonTraining.OnServerEvent:Connect(function(player, sessionId)
+	if not RateLimiter.check(player, "SkipDragonTraining", 0.3) then
+		return
+	end
+	skipTraining(player, sessionId)
 end)
 
 Players.PlayerAdded:Connect(loadPlayerSessions)

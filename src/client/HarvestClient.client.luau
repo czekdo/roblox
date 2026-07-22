@@ -358,6 +358,33 @@ local function getCurrentEssence()
 	)
 end
 
+local function getCurrentGems()
+	return tonumber(player:GetAttribute("PremiumGems")) or 0
+end
+
+-- The Gem Egg is bought with Gems instead of Essence (eggInfo.GemCost set instead of .Cost) - these
+-- three helpers keep every cost/afford/display check below currency-agnostic.
+local function isGemEgg(eggInfo)
+	return eggInfo.GemCost ~= nil
+end
+
+local function getEggCostText(eggInfo)
+	if isGemEgg(eggInfo) then
+		return formatNumber(eggInfo.GemCost) .. " Gems"
+	end
+	return formatNumber(eggInfo.Cost) .. " Essence"
+end
+
+local function canAffordEgg(eggInfo)
+	if eggInfo.Reserved then
+		return false
+	end
+	if isGemEgg(eggInfo) then
+		return getCurrentGems() >= eggInfo.GemCost
+	end
+	return getCurrentEssence() >= eggInfo.Cost
+end
+
 local EGG_SHOP_GOLD = Color3.fromRGB(235, 188, 82)
 local EGG_SHOP_GOLD_DIM = Color3.fromRGB(120, 98, 52)
 local EGG_SHOP_PANEL_BG = Color3.fromRGB(14, 20, 42)
@@ -518,11 +545,10 @@ local function updateEggShopCard(eggType)
 	local purchases = stats.Purchases or {}
 	local hatched = stats.Hatched or {}
 	local owned = ownedCounts[eggType] or (stats.OwnedEggs and stats.OwnedEggs[eggType]) or 0
-	cardData.cost.Text = formatNumber(eggInfo.Cost) .. " Essence"
+	cardData.cost.Text = getEggCostText(eggInfo)
 	cardData.owned.Text = "Owned: " .. tostring(owned)
 	if cardData.cardStroke then
-		local canBuy = not eggInfo.Reserved and getCurrentEssence() >= eggInfo.Cost
-		cardData.cardStroke.Transparency = canBuy and 0.35 or 0.55
+		cardData.cardStroke.Transparency = canAffordEgg(eggInfo) and 0.35 or 0.55
 	end
 end
 
@@ -579,7 +605,7 @@ selectEggShopEgg = function(eggType)
 		eggShopPreviewDesc.Text = eggInfo.Description
 	end
 	if eggShopPreviewCost then
-		eggShopPreviewCost.Text = formatNumber(eggInfo.Cost) .. " Essence"
+		eggShopPreviewCost.Text = getEggCostText(eggInfo)
 	end
 
 	if eggShopPreviewInfoScroll then
@@ -671,7 +697,7 @@ selectEggShopEgg = function(eggType)
 		})
 	end
 
-	local canBuy = not eggInfo.Reserved and getCurrentEssence() >= eggInfo.Cost
+	local canBuy = canAffordEgg(eggInfo)
 	if eggShopPurchaseButton then
 		eggShopPurchaseButton.Text = eggInfo.Reserved and "Reserved" or "Purchase Egg"
 		eggShopPurchaseButton.Active = true
@@ -755,7 +781,7 @@ local function createEggShopCard(parent, eggType)
 
 	local cost = Theme.createText({
 		Name = "Cost", Parent = card,
-		Text = formatNumber(eggInfo.Cost) .. " Essence",
+		Text = getEggCostText(eggInfo),
 		Size = UDim2.new(1, -66, 0, 16),
 		Position = UDim2.fromOffset(60, 32),
 		TextSize = 12,
@@ -1011,12 +1037,11 @@ local function createEggShopUI()
 				setEggShopStatus(eggInfo.DisplayName .. " is reserved for future dragons.")
 				return
 			end
-			local affordable = getCurrentEssence() >= eggInfo.Cost
-			if affordable then
+			if canAffordEgg(eggInfo) then
 				setEggShopStatus("Purchasing " .. eggInfo.DisplayName .. "...")
 				BuyDragonEgg:FireServer(selectedEggType)
 			else
-				setEggShopStatus("Need " .. formatNumber(eggInfo.Cost) .. " Dragon Essence. Keep harvesting crystals!")
+				setEggShopStatus("Need " .. getEggCostText(eggInfo) .. ". Keep collecting!")
 			end
 		end,
 	})
@@ -1626,6 +1651,7 @@ local ABILITY_VFX_COLORS = {
 	OceanBlessing = Color3.fromRGB(70, 170, 255),
 	VoidRift = Color3.fromRGB(140, 80, 220),
 	Starfall = Color3.fromRGB(255, 230, 150),
+	RoyalBlessing = Color3.fromRGB(255, 215, 130),
 }
 
 local function emitBurst(parent, color, count, size)

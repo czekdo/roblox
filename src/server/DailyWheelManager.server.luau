@@ -60,13 +60,21 @@ local function saveDataNow(player)
 end
 
 local function loadPlayer(player)
-	local data = { LastSpinDayKey = nil }
+	local data = { LastSpinDayKey = nil, ExtraSpinDayKey = nil, ExtraSpinsUsedToday = 0 }
 	if dataStoreAvailable and wheelStore then
 		local success, result = pcall(function()
 			return wheelStore:GetAsync(tostring(player.UserId))
 		end)
-		if success and typeof(result) == "table" and typeof(result.LastSpinDayKey) == "string" then
-			data.LastSpinDayKey = result.LastSpinDayKey
+		if success and typeof(result) == "table" then
+			if typeof(result.LastSpinDayKey) == "string" then
+				data.LastSpinDayKey = result.LastSpinDayKey
+			end
+			if typeof(result.ExtraSpinDayKey) == "string" then
+				data.ExtraSpinDayKey = result.ExtraSpinDayKey
+			end
+			if typeof(result.ExtraSpinsUsedToday) == "number" then
+				data.ExtraSpinsUsedToday = result.ExtraSpinsUsedToday
+			end
 		elseif not success then
 			warn("[DailyWheelManager] Failed to load wheel data for", player.UserId, result)
 		end
@@ -79,17 +87,27 @@ local function canSpin(player)
 	return data ~= nil and data.LastSpinDayKey ~= getDayKey()
 end
 
+local function getExtraSpinsUsedToday(data)
+	if data.ExtraSpinDayKey ~= getDayKey() then
+		return 0
+	end
+	return data.ExtraSpinsUsedToday or 0
+end
+
 RequestWheelState.OnServerInvoke = function(player)
 	if not playerData[player] then
 		loadPlayer(player)
 	end
+	local data = playerData[player]
 	return {
 		canSpin = canSpin(player),
 		nextResetAt = getNextResetAt(),
+		extraSpinCost = DailyWheelConfig.ExtraSpin.Cost,
+		extraSpinsRemaining = DailyWheelConfig.ExtraSpin.MaxPerDay - getExtraSpinsUsedToday(data),
 	}
 end
 
-RequestSpin.OnServerEvent:Connect(function(player)
+RequestSpin.OnServerEvent:Connect(function(player, wantsPaidSpin)
 	if not RateLimiter.check(player, "RequestSpin", 0.5) then
 		return
 	end
@@ -97,19 +115,41 @@ RequestSpin.OnServerEvent:Connect(function(player)
 	if not data then
 		return
 	end
+
+	local isPaidSpin = false
 	if not canSpin(player) then
-		WheelSpinResult:FireClient(player, {
-			success = false,
-			message = "Already spun today. Come back tomorrow!",
-			nextResetAt = getNextResetAt(),
-		})
-		return
+		if not wantsPaidSpin then
+			WheelSpinResult:FireClient(player, {
+				success = false,
+				message = "Already spun today. Come back tomorrow!",
+				nextResetAt = getNextResetAt(),
+			})
+			return
+		end
+
+		local usedToday = getExtraSpinsUsedToday(data)
+		if usedToday >= DailyWheelConfig.ExtraSpin.MaxPerDay then
+			WheelSpinResult:FireClient(player, { success = false, message = "No more extra spins today." })
+			return
+		end
+		local cost = DailyWheelConfig.ExtraSpin.Cost
+		local gems = player:GetAttribute("PremiumGems") or 0
+		if gems < cost then
+			WheelSpinResult:FireClient(player, { success = false, message = "Not enough Gems." })
+			return
+		end
+		player:SetAttribute("PremiumGems", gems - cost)
+		data.ExtraSpinDayKey = getDayKey()
+		data.ExtraSpinsUsedToday = usedToday + 1
+		isPaidSpin = true
 	end
 
 	local segment, index = DailyWheelConfig.RollSegment()
 	local applied = RewardService.Grant(player, segment.Reward, { Source = "DailyWheel" })
 
-	data.LastSpinDayKey = getDayKey()
+	if not isPaidSpin then
+		data.LastSpinDayKey = getDayKey()
+	end
 	saveDataNow(player)
 	QuestProgressSignal:Fire(player, "SpinDailyWheel", 1)
 
@@ -120,6 +160,7 @@ RequestSpin.OnServerEvent:Connect(function(player)
 		message = segment.Reward.Text or segment.DisplayName,
 		applied = applied,
 		nextResetAt = getNextResetAt(),
+		extraSpinsRemaining = DailyWheelConfig.ExtraSpin.MaxPerDay - getExtraSpinsUsedToday(data),
 	})
 end)
 

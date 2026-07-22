@@ -1,5 +1,12 @@
 local DailyWheelConfig = {}
 
+-- A Gems sink: once the free daily spin is used, players can pay Gems for extra spins, capped per
+-- day so it stays a nice-to-have rather than a way to grind the wheel's rewards without limit.
+DailyWheelConfig.ExtraSpin = {
+	Cost = 15,
+	MaxPerDay = 3,
+}
+
 -- The 2D wheel graphic (drawn in DailyWheelClient.client.luau) has 8 wedges of unequal width.
 -- Since the reward economy only has 6 distinct reward types, Dragon Essence and Quest Egg (the two
 -- most common rewards) each occupy two wedges; their weights are split across their two entries so

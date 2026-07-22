@@ -16,6 +16,7 @@ local RequestDragonTrainingData = HarvestEvents:WaitForChild("RequestDragonTrain
 local StartDragonTraining = HarvestEvents:WaitForChild("StartDragonTraining")
 local ClaimDragonTraining = HarvestEvents:WaitForChild("ClaimDragonTraining")
 local CancelDragonTraining = HarvestEvents:WaitForChild("CancelDragonTraining")
+local SkipDragonTraining = HarvestEvents:WaitForChild("SkipDragonTraining")
 local DragonTrainingUpdate = HarvestEvents:WaitForChild("DragonTrainingUpdate")
 
 local trainingGui = nil
@@ -168,21 +169,38 @@ local function updateTrainingUI()
 			TextSize = 13, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextLight, YAlign = Enum.TextYAlignment.Top, ZIndex = 10,
 		})
 
-		Theme.createButton({
-			Name = "SessionAction", Parent = card,
-			Text = session.complete and "Claim" or "Cancel",
-			Size = UDim2.fromOffset(120, 36), Position = UDim2.new(1, -130, 0.5, -18),
-			AnchorPoint = Vector2.new(0, 0.5),
-			Bg = session.complete and Theme.Colors.Success or Theme.Colors.Danger,
-			TextSize = 14, ZIndex = 10,
-			OnClick = function()
-				if session.complete then
+		if session.complete then
+			Theme.createButton({
+				Name = "SessionAction", Parent = card, Text = "Claim",
+				Size = UDim2.fromOffset(120, 36), Position = UDim2.new(1, -130, 0.5, -18),
+				AnchorPoint = Vector2.new(0, 0.5), Bg = Theme.Colors.Success,
+				TextSize = 14, ZIndex = 10,
+				OnClick = function()
 					ClaimDragonTraining:FireServer(session.id)
-				else
+				end,
+			})
+		else
+			Theme.createButton({
+				Name = "SessionAction", Parent = card, Text = "Cancel",
+				Size = UDim2.fromOffset(120, 34), Position = UDim2.new(1, -130, 0, 4),
+				Bg = Theme.Colors.Danger, TextSize = 13, ZIndex = 10,
+				OnClick = function()
 					CancelDragonTraining:FireServer(session.id)
-				end
-			end,
-		})
+				end,
+			})
+			-- Gems sink: pay to instantly finish this session instead of waiting. Cost is priced
+			-- off remaining time server-side (DragonTrainingManager.getSkipCost) and sent in
+			-- session.skipCost each state update.
+			Theme.createButton({
+				Name = "SkipButton", Parent = card,
+				Text = "Skip (" .. tostring(session.skipCost or 0) .. " Gems)",
+				Size = UDim2.fromOffset(120, 34), Position = UDim2.new(1, -130, 0, 40),
+				Bg = Theme.Colors.Gold, TextSize = 12, ZIndex = 10,
+				OnClick = function()
+					SkipDragonTraining:FireServer(session.id)
+				end,
+			})
+		end
 	end
 
 	local dragon = getSelectedDragon()

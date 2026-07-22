@@ -198,7 +198,9 @@ end
 -- ============================================================
 
 local screenGui, panel, dim
-local statusLabel, spinButton, resultLabel
+local statusLabel, spinButton, resultLabel, extraSpinButton
+local lastExtraSpinsRemaining = DailyWheelConfig.ExtraSpin.MaxPerDay
+local lastExtraSpinCost = DailyWheelConfig.ExtraSpin.Cost
 
 local function ensureUi()
 	if screenGui then
@@ -341,6 +343,24 @@ local function ensureUi()
 			RequestSpin:FireServer()
 		end,
 	})
+
+	-- Only shown once the free daily spin is used - lets players pay Gems for a few more spins,
+	-- capped per day (DailyWheelConfig.ExtraSpin.MaxPerDay).
+	extraSpinButton = Theme.createButton({
+		Name = "ExtraSpinButton", Parent = panel, Text = "Extra Spin",
+		Size = UDim2.new(1, -32, 0, 48), Position = UDim2.new(0.5, 0, 1, -24),
+		AnchorPoint = Vector2.new(0.5, 1), Bg = Theme.Colors.Gold, TextSize = 16, ZIndex = 9,
+		Visible = false,
+		OnClick = function()
+			if spinning or not extraSpinButton.Active or lastExtraSpinsRemaining <= 0 then
+				return
+			end
+			extraSpinButton.Active = false
+			extraSpinButton.Text = "Spinning..."
+			statusLabel.Text = "Good luck!"
+			RequestSpin:FireServer(true)
+		end,
+	})
 end
 
 local function formatCountdown(secondsLeft)
@@ -359,12 +379,27 @@ local function stopCountdown()
 	end
 end
 
+local function updateExtraSpinButton()
+	if not extraSpinButton then
+		return
+	end
+	if lastExtraSpinsRemaining <= 0 then
+		extraSpinButton.Text = "No Extra Spins Left"
+		extraSpinButton.Active = false
+	else
+		extraSpinButton.Text = string.format("Extra Spin (%d Gems) - %d left", lastExtraSpinCost, lastExtraSpinsRemaining)
+		extraSpinButton.Active = true
+	end
+end
+
 local function showCooldownState(nextResetAt)
 	if not spinButton then
 		return
 	end
 	stopCountdown()
 	spinButton.Visible = false
+	extraSpinButton.Visible = true
+	updateExtraSpinButton()
 	local function update()
 		local secondsLeft = nextResetAt - os.time()
 		if secondsLeft <= 0 then
@@ -373,6 +408,7 @@ local function showCooldownState(nextResetAt)
 			spinButton.Visible = true
 			spinButton.Text = "Spin"
 			spinButton.Active = true
+			extraSpinButton.Visible = false
 			return
 		end
 		statusLabel.Text = "Already spun today. Next spin in:\n" .. formatCountdown(secondsLeft)
@@ -393,6 +429,7 @@ local function showReadyState()
 	spinButton.Visible = true
 	spinButton.Text = "Spin"
 	spinButton.Active = true
+	extraSpinButton.Visible = false
 end
 
 local function refreshState()
@@ -404,6 +441,8 @@ local function refreshState()
 		spinButton.Visible = false
 		return
 	end
+	lastExtraSpinsRemaining = state.extraSpinsRemaining or lastExtraSpinsRemaining
+	lastExtraSpinCost = state.extraSpinCost or lastExtraSpinCost
 	if state.canSpin then
 		showReadyState()
 	else
@@ -443,10 +482,17 @@ WheelSpinResult.OnClientEvent:Connect(function(payload)
 		end
 		if payload.nextResetAt then
 			showCooldownState(payload.nextResetAt)
+		else
+			-- Paid-spin rejection (no Gems / daily cap reached) - no cooldown change, just
+			-- re-enable the extra spin button instead of leaving it stuck on "Spinning...".
+			updateExtraSpinButton()
 		end
 		return
 	end
 
+	if payload.extraSpinsRemaining then
+		lastExtraSpinsRemaining = payload.extraSpinsRemaining
+	end
 	playSpinAnimation(payload.segmentIndex or 1, function()
 		if resultLabel then
 			resultLabel.Text = "🎉 " .. tostring(payload.message or "You won a reward!")
