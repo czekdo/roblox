@@ -216,6 +216,27 @@ local function updateTrainingUI()
 	end
 end
 
+-- Cheap per-second tick used only to keep the "X left" countdown fresh while the panel is open.
+-- Deliberately does NOT touch dragon/program rows or destroy+recreate session cards - doing that
+-- every second (the previous behavior) caused a visible flicker and could re-trigger a button's
+-- hover state if the cursor happened to be sitting over a row when it got rebuilt.
+local function refreshSessionCountdowns()
+	if not sessionList then
+		return
+	end
+	for _, session in trainingState.sessions do
+		if not session.complete then
+			local card = sessionList:FindFirstChild("Session_" .. session.id)
+			local info = card and card:FindFirstChild("Info")
+			if info then
+				local dragonName = session.dragon and (session.dragon.displayName or session.dragon.dragonType) or ("Dragon #" .. tostring(session.dragonId))
+				local remaining = math.max(0, math.floor((session.endsAt or 0) - workspace:GetServerTimeNow()))
+				info.Text = dragonName .. "\nIn training — " .. formatTime(remaining) .. " left"
+			end
+		end
+	end
+end
+
 local function applyTrainingPayload(payload)
 	if typeof(payload) ~= "table" then
 		return
@@ -319,9 +340,14 @@ local function createTrainingUI()
 	startButton = Theme.createButton({
 		Name = "StartTrainingButton", Parent = trainingPanel,
 		Text = "Select a dragon and training program",
-		Size = UDim2.fromOffset(576, 48), Position = UDim2.fromOffset(314, 438),
-		Bg = Theme.Colors.Success, TextSize = 16, ZIndex = 8,
+		Size = UDim2.fromOffset(280, 48), Position = UDim2.fromOffset(314, 438),
+		Bg = Theme.Colors.Success, TextSize = 14, ZIndex = 8,
 	})
+	startButton.TextScaled = true
+	local startButtonSizeConstraint = Instance.new("UITextSizeConstraint")
+	startButtonSizeConstraint.MaxTextSize = 14
+	startButtonSizeConstraint.Parent = startButton
+	Theme.padding(startButton, 4, 4, 8, 8)
 
 	statusLabel = Theme.createText({
 		Name = "Status", Parent = trainingPanel,
@@ -430,7 +456,7 @@ end)
 task.spawn(function()
 	while trainingGui and trainingGui.Parent do
 		if trainingPanel and trainingPanel.Visible and #trainingState.sessions > 0 then
-			updateTrainingUI()
+			refreshSessionCountdowns()
 		end
 		task.wait(1)
 	end

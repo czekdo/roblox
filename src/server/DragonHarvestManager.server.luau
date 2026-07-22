@@ -642,6 +642,51 @@ local function getDragonBody(clone)
 		or clone:FindFirstChildWhichIsA("BasePart", true)
 end
 
+-- Some imported models (e.g. AI-generated meshes) nest their body under an extra Model wrapper
+-- instead of parenting it directly under the dragon's outer Model. Client scripts locate the body
+-- via dragon:WaitForChild("DragonRoot", n), which only checks direct children, so a nested body
+-- silently times out there and the dragon never gets visually tracked (looks frozen/inert). Flatten
+-- it here so every species has the same direct-child shape regardless of how it was authored.
+local function flattenDragonBody(clone, body)
+	if body.Parent ~= clone then
+		body.Parent = clone
+	end
+end
+
+-- Reference species used to normalize body scale: some imported meshes (e.g. AI-generated ones)
+-- are authored at a different native size than the game's hand-built dragons, so applying the same
+-- ScaleTo() factor leaves them visibly smaller/larger. Correcting by native bounding-box size keeps
+-- every species reading as roughly the same physical size at the same rarity/scale roll.
+local REFERENCE_DRAGON_TYPE = STARTER_DRAGON_TYPE
+local modelNativeSizeCache = {}
+
+local function getModelNativeSize(dragonType)
+	local cached = modelNativeSizeCache[dragonType]
+	if cached then
+		return cached
+	end
+	local template = dragonType and dragonModelsFolder:FindFirstChild(dragonType)
+	local size = 1
+	if template and template:IsA("Model") then
+		local _, boundSize = template:GetBoundingBox()
+		size = boundSize.Magnitude
+	end
+	modelNativeSizeCache[dragonType] = size
+	return size
+end
+
+local function getModelScaleCorrection(dragonType)
+	if not dragonType or dragonType == REFERENCE_DRAGON_TYPE then
+		return 1
+	end
+	local referenceSize = getModelNativeSize(REFERENCE_DRAGON_TYPE)
+	local thisSize = getModelNativeSize(dragonType)
+	if thisSize <= 0 then
+		return 1
+	end
+	return referenceSize / thisSize
+end
+
 local function createRarityLight(body, rarityInfo, brightness, range)
 	local light = Instance.new("PointLight")
 	light.Name = "RarityGlow"
@@ -840,7 +885,11 @@ end
 
 local function prepareDragonModel(clone, rarity)
 	local rarityInfo = DragonEggConfig.GetRarityInfo(rarity or "Common")
-	local scaleFactor = HarvestConfig.BaseDragonScale * (0.9 + math.random() * 0.2) * (1 + rarityInfo.ScaleBonus)
+	local dragonType = clone:GetAttribute("DragonType")
+	local scaleFactor = HarvestConfig.BaseDragonScale
+		* (0.9 + math.random() * 0.2)
+		* (1 + rarityInfo.ScaleBonus)
+		* getModelScaleCorrection(dragonType)
 	clone:ScaleTo(scaleFactor)
 
 	local body = getDragonBody(clone)
@@ -853,6 +902,7 @@ local function prepareDragonModel(clone, rarity)
 	body.Anchored = true
 	body.CanCollide = false
 	body.CanQuery = false
+	flattenDragonBody(clone, body)
 	clone.PrimaryPart = body
 
 	for _, descendant in clone:GetDescendants() do
@@ -1341,6 +1391,13 @@ local function createEgg(player, position, eggType, options)
 	end
 	if eggInfo.Reserved or not eggInfo.Dragons or #eggInfo.Dragons == 0 then
 		sendEggShopUpdate(player, eggInfo.DisplayName .. " is reserved for future dragons")
+		return
+	end
+	-- Server-side enforcement of the Featured Egg's limited-time window - the client hides/disables
+	-- the buy button while it's closed, but that's only a convenience; a client could still fire
+	-- this remote directly, so the actual gate has to live here too.
+	if eggInfo.IsFeatured and not DragonEggConfig.IsFeaturedEggActive() then
+		sendEggShopUpdate(player, eggInfo.DisplayName .. " is not available right now - check back soon")
 		return
 	end
 	if eggInfo.RequiresIsland and not options.rewardGranted then

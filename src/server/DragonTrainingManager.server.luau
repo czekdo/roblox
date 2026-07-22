@@ -12,7 +12,16 @@ local RequestDragonTrainingData = HarvestEvents:WaitForChild("RequestDragonTrain
 local StartDragonTraining = HarvestEvents:WaitForChild("StartDragonTraining")
 local ClaimDragonTraining = HarvestEvents:WaitForChild("ClaimDragonTraining")
 local CancelDragonTraining = HarvestEvents:WaitForChild("CancelDragonTraining")
-local SkipDragonTraining = HarvestEvents:WaitForChild("SkipDragonTraining")
+-- Created here (not WaitForChild) if missing: this RemoteEvent lives directly under HarvestEvents
+-- rather than in a Rojo-managed source folder, so it only exists as a plain Studio Instance -
+-- fragile if it's ever added mid-session and the place isn't saved before Studio restarts. Having
+-- the server ensure its own existence means the feature can never silently break that way again.
+local SkipDragonTraining = HarvestEvents:FindFirstChild("SkipDragonTraining")
+if not SkipDragonTraining then
+	SkipDragonTraining = Instance.new("RemoteEvent")
+	SkipDragonTraining.Name = "SkipDragonTraining"
+	SkipDragonTraining.Parent = HarvestEvents
+end
 local DragonTrainingUpdate = HarvestEvents:WaitForChild("DragonTrainingUpdate")
 local QuestEvents = ReplicatedStorage:WaitForChild("QuestEvents")
 local QuestProgressSignal = QuestEvents:WaitForChild("QuestProgressSignal")
@@ -424,14 +433,19 @@ task.spawn(function()
 		for _, player in Players:GetPlayers() do
 			local data = playerSessions[player]
 			if data and data.loaded then
-				local hasReady = false
+				-- Only push when a session *newly* completed since the last tick. Without the
+				-- notifiedComplete gate this fired every 5s for as long as any session sat
+				-- unclaimed, spamming a duplicate toast forever and forcing a full client-side
+				-- panel rebuild each time (visible as a repeated flicker/hover-retrigger on the
+				-- training cards).
+				local newlyReady = false
 				for _, session in getActiveSessions(player) do
-					if isSessionComplete(session) then
-						hasReady = true
-						break
+					if isSessionComplete(session) and not session.notifiedComplete then
+						session.notifiedComplete = true
+						newlyReady = true
 					end
 				end
-				if hasReady then
+				if newlyReady then
 					sendUpdate(player, "Training complete! Claim your rewards at the Academy.")
 				end
 			end
