@@ -11,6 +11,12 @@ local EggOpeningCamera = require(script.Parent:WaitForChild("EggOpeningCamera"))
 
 local EggOpeningSequence = {}
 
+-- The egg model settles at its own natural authored scale during the cinematic, which reads as
+-- tiny on screen. This multiplies every scale value in the spawn/reveal phases below, so the egg
+-- (and everything computed relative to it, like the reveal-phase scaleUp) is uniformly bigger
+-- without changing the animation's shape/timing.
+local EGG_DISPLAY_SCALE_BOOST = 1.8
+
 local function tween(instance, info, goals)
 	local tweenObj = TweenService:Create(instance, info, goals)
 	tweenObj:Play()
@@ -268,7 +274,7 @@ function EggOpeningSequence.Play(context)
 	-- Phase 1: Spawn
 	EggOpeningEffects.FadeModelTransparency(eggModel, 0.85, 0)
 	pcall(function()
-		eggModel:ScaleTo(0.8)
+		eggModel:ScaleTo(0.8 * EGG_DISPLAY_SCALE_BOOST)
 	end)
 	EggOpeningEffects.PlaySound("EggAppear", 0.45, profile.soundPitch)
 	EggOpeningEffects.FadeModelTransparency(eggModel, 0, 0.55)
@@ -277,15 +283,15 @@ function EggOpeningSequence.Play(context)
 	end)
 
 	local scaleValue = Instance.new("NumberValue")
-	scaleValue.Value = 0.8
+	scaleValue.Value = 0.8 * EGG_DISPLAY_SCALE_BOOST
 	local scaleConnection
 	scaleConnection = scaleValue.Changed:Connect(function(value)
 		pcall(function()
 			eggModel:ScaleTo(value)
 		end)
 	end)
-	tween(scaleValue, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Value = 1.05 })
-	tween(scaleValue, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Value = 1 })
+	tween(scaleValue, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Value = 1.05 * EGG_DISPLAY_SCALE_BOOST })
+	tween(scaleValue, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Value = 1 * EGG_DISPLAY_SCALE_BOOST })
 	if ambientEmitters.dust then
 		ambientEmitters.dust:Emit(math.floor(8 * profile.particleScale))
 	end

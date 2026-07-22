@@ -49,6 +49,22 @@ local function getRarityColor(rarity)
 	return DragonEggConfig.GetRarityInfo(rarity).Color
 end
 
+-- Per-species reveal art (ServerStorage.Image decals, uploaded by hand) shown in the reward card
+-- instead of the generic egg-shell icon, so the hatch reveal actually shows the dragon you got.
+local DRAGON_TYPE_ICONS = {
+	ForestDragon = "rbxassetid://114447555397002",
+	IceDragon = "rbxassetid://79175381980147",
+	FireDragon = "rbxassetid://130942758121470",
+	LavaDragon = "rbxassetid://113492446505113",
+	StormDragon = "rbxassetid://108007135510335",
+	VoidDragon = "rbxassetid://106499302625266",
+	CrystalDragon = "rbxassetid://110920243474682",
+	CelestialDragon = "rbxassetid://137631014879654",
+	PoisonDragon = "rbxassetid://81777420880303",
+	CoralOceanDragon = "rbxassetid://140189536944717",
+	VipDragon = "rbxassetid://117149685970656",
+}
+
 local function createCinematicGui()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "EggHatchCinematicUI"
@@ -241,7 +257,7 @@ local function showRewardCard(payload, profile, controller)
 	rarityLabel.Text = string.upper(rarity)
 	rarityLabel.TextColor3 = rarityColor
 	eggLabel.Text = payload.eggDisplayName or eggInfo.DisplayName or "Egg"
-	rewardIcon.Image = eggInfo.Icon or Theme.Icons.Egg
+	rewardIcon.Image = DRAGON_TYPE_ICONS[payload.dragonType] or eggInfo.Icon or Theme.Icons.Egg
 
 	local revealStroke = revealCard:FindFirstChildOfClass("UIStroke")
 	if revealStroke then

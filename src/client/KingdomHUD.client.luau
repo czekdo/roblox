@@ -111,7 +111,10 @@ local _, essenceVal = Theme.createPremiumResourceCapsule(centerWrap, Theme.Icons
 essenceLabel = essenceVal
 local _, gemsVal = Theme.createPremiumResourceCapsule(centerWrap, Theme.Icons.Premium, "GemsAmount", 2)
 gemsLabel = gemsVal
-gemsLabel.Text = Theme.formatCompact(player:GetAttribute("PremiumGems") or 2450)
+-- Was "or 2450" - a leftover dummy/mockup value. New players never actually have a starting gem
+-- balance (nothing grants one), so this showed a fake "2.5K" that only ever got corrected once the
+-- attribute changed - i.e. never, for a player who hasn't earned any gems yet.
+gemsLabel.Text = Theme.formatCompact(player:GetAttribute("PremiumGems") or 0)
 local _, shardsVal = Theme.createPremiumResourceCapsule(centerWrap, Theme.Icons.Star, "AscensionShardsAmount", 3)
 shardsLabel = shardsVal
 shardsLabel.Text = Theme.formatCompact(player:GetAttribute("AscensionShards") or 0)

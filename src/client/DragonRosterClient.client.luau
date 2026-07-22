@@ -278,6 +278,11 @@ end
 local function populateDragonListRow(row, dragon)
 	row.Text = ""
 	local rarityColor = Theme.getRarityColor(dragon.rarity or "Common")
+	-- Row is 68px tall with Theme.createListRow's own 8px top/bottom UIPadding, which shifts every
+	-- offset-positioned child down by 8px (confirmed live: a child coded at Y=8 actually renders at
+	-- Y=16). The three text lines below are laid out to end at coded Y=52 (final Y=60), 8px clear of
+	-- the row's true 68px bottom edge - previously they were tuned for a 56px row assuming no such
+	-- shift, so the last line ("In Storage" etc.) rendered 8px past the row's own border.
 	local iconFrame, iconImage = Theme.createIconFrame(row, Theme.Icons.Dragon, 36, 8)
 	iconFrame.Position = UDim2.fromOffset(6, 8)
 	iconImage.ImageColor3 = rarityColor
@@ -285,7 +290,7 @@ local function populateDragonListRow(row, dragon)
 	Theme.createText({
 		Name = "RowName", Parent = row,
 		Text = dragon.displayName or dragon.dragonType or "Dragon",
-		Size = UDim2.new(1, -58, 0, 18), Position = UDim2.fromOffset(50, 6),
+		Size = UDim2.new(1, -58, 0, 18), Position = UDim2.fromOffset(50, 0),
 		TextSize = 13, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextLight,
 		Wrapped = false, Truncate = Enum.TextTruncate.AtEnd, ZIndex = 9,
 	})
@@ -293,7 +298,7 @@ local function populateDragonListRow(row, dragon)
 	Theme.createText({
 		Name = "RowMeta", Parent = row,
 		Text = string.format("Lv. %s %s  •  %s", tostring(dragon.level or 1), dragon.stars or "", dragon.rarity or "Common"),
-		Size = UDim2.new(1, -58, 0, 16), Position = UDim2.fromOffset(50, 26),
+		Size = UDim2.new(1, -58, 0, 16), Position = UDim2.fromOffset(50, 20),
 		TextSize = 11, Font = Theme.Fonts.Regular, Color = rarityColor, ZIndex = 9,
 	})
 
@@ -305,7 +310,7 @@ local function populateDragonListRow(row, dragon)
 	Theme.createText({
 		Name = "RowActivity", Parent = row,
 		Text = activity,
-		Size = UDim2.new(0.55, 0, 0, 14), Position = UDim2.fromOffset(50, 42),
+		Size = UDim2.new(0.55, 0, 0, 14), Position = UDim2.fromOffset(50, 38),
 		TextSize = 10, Font = Theme.Fonts.Bold, Color = activityColor, ZIndex = 9,
 	})
 
@@ -322,7 +327,7 @@ local function populateDragonListRow(row, dragon)
 	if dragon.isLocked then
 		Theme.createText({
 			Name = "LockBadge", Parent = row, Text = "🔒",
-			Size = UDim2.fromOffset(16, 16), Position = UDim2.new(1, -22, 0, 30),
+			Size = UDim2.fromOffset(16, 16), Position = UDim2.new(1, -22, 0, 32),
 			AnchorPoint = Vector2.new(1, 0), TextSize = 12, ZIndex = 9,
 		})
 	end
@@ -331,7 +336,31 @@ end
 local function highlightDragonRows()
 	for dragonId, row in listRows do
 		local dragon = getDragonById(dragonId)
-		Theme.setListRowSelected(row, dragonId == selectedDragonId, dragon and Theme.getRarityColor(dragon.rarity or "Common"))
+		local rarityColor = Theme.getRarityColor(dragon and dragon.rarity or "Common")
+		local isSelected = dragonId == selectedDragonId
+
+		-- Selected rows previously filled with the FULL, saturated rarity color (e.g. Epic's bright
+		-- purple) - but RowMeta's text is ALSO colored by rarity, so on selection its text turned
+		-- the exact same color as its own background and disappeared. Blending the accent toward
+		-- the row's normal dark navy keeps the rarity identity as a tint (and the existing bright
+		-- gold border still marks the selection clearly) while guaranteeing enough contrast for
+		-- light text.
+		local selectedBg = rarityColor:Lerp(Theme.Colors.NavyEdge, 0.55)
+		Theme.setListRowSelected(row, isSelected, selectedBg)
+
+		local rowMeta = row:FindFirstChild("RowMeta")
+		if rowMeta then
+			rowMeta.TextColor3 = isSelected and Theme.Colors.TextLight or rarityColor
+		end
+
+		local rowActivity = row:FindFirstChild("RowActivity")
+		if rowActivity and dragon then
+			local activity, activityColor = getActivityText(dragon)
+			if dragon.isEquipped ~= true then
+				activityColor = Theme.Colors.TextMuted
+			end
+			rowActivity.TextColor3 = isSelected and Theme.Colors.TextLight or activityColor
+		end
 	end
 end
 
@@ -367,21 +396,46 @@ renderDragonDetail = function(detailPanel, dragon)
 	local rarityColor = Theme.getRarityColor(dragon.rarity or "Common")
 	local stats = dragon.stats or {}
 
-	local iconFrame, iconImage = Theme.createIconFrame(detailPanel, Theme.Icons.Dragon, 88, 8)
+	-- Info/ability/stats content lives in its own scroll area above the fixed action-button rows
+	-- (which stay direct children of detailPanel, anchored to its bottom) - previously this content
+	-- was positioned with fixed offsets directly against detailPanel, and StatsPanel's bottom
+	-- silently overlapped the button rows whenever detailPanel's actual height didn't match the
+	-- offsets' original assumption (which it commonly didn't - detailPanel's height is a % of the
+	-- whole roster panel, not fixed). Scrolling means the content can never collide with the
+	-- buttons regardless of panel size.
+	local detailScroll = Instance.new("ScrollingFrame")
+	detailScroll.Name = "DetailScroll"
+	detailScroll.Size = UDim2.new(1, 0, 1, -86)
+	detailScroll.Position = UDim2.fromOffset(0, 0)
+	detailScroll.BackgroundTransparency = 1
+	detailScroll.BorderSizePixel = 0
+	detailScroll.ScrollBarThickness = 6
+	detailScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	detailScroll.CanvasSize = UDim2.fromOffset(0, 0)
+	detailScroll.ZIndex = 8
+	detailScroll.Parent = detailPanel
+
+	local iconFrame, iconImage = Theme.createIconFrame(detailScroll, Theme.Icons.Dragon, 88, 8)
 	iconFrame.Position = UDim2.new(0.5, 0, 0, 0)
 	iconFrame.AnchorPoint = Vector2.new(0.5, 0)
 	iconImage.ImageColor3 = rarityColor
 
-	Theme.createText({
-		Name = "DetailName", Parent = detailPanel,
+	local detailNameLabel = Theme.createText({
+		Name = "DetailName", Parent = detailScroll,
 		Text = dragon.displayName or dragon.dragonType or "Dragon",
-		Size = UDim2.new(1, 0, 0, 26), Position = UDim2.fromOffset(0, 96),
+		Size = UDim2.new(1, -12, 0, 26), Position = UDim2.fromOffset(6, 96),
 		TextSize = 20, Font = Theme.Fonts.Title, Color = Theme.Colors.TextLight,
 		XAlign = Enum.TextXAlignment.Center, ZIndex = 9,
 	})
+	-- Safety net for unusually long display names: shrink to fit the single-line title box rather
+	-- than spilling past the panel's edges.
+	detailNameLabel.TextScaled = true
+	local detailNameSizeConstraint = Instance.new("UITextSizeConstraint")
+	detailNameSizeConstraint.MaxTextSize = 20
+	detailNameSizeConstraint.Parent = detailNameLabel
 
 	Theme.createText({
-		Name = "DetailMeta", Parent = detailPanel,
+		Name = "DetailMeta", Parent = detailScroll,
 		Text = string.format("%s  •  Lv. %s %s", string.upper(dragon.rarity or "COMMON"), tostring(dragon.level or 1), dragon.stars or ""),
 		Size = UDim2.new(1, 0, 0, 18), Position = UDim2.fromOffset(0, 122),
 		TextSize = 12, Font = Theme.Fonts.Bold, Color = rarityColor,
@@ -391,7 +445,7 @@ renderDragonDetail = function(detailPanel, dragon)
 	local activity, activityColor = getActivityText(dragon)
 	local assignedText = dragon.assigned and "  •  ASSIGNED" or ""
 	Theme.createText({
-		Name = "DetailActivity", Parent = detailPanel,
+		Name = "DetailActivity", Parent = detailScroll,
 		Text = activity .. assignedText,
 		Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 142),
 		TextSize = 11, Font = Theme.Fonts.Bold, Color = activityColor,
@@ -399,7 +453,7 @@ renderDragonDetail = function(detailPanel, dragon)
 	})
 
 	Theme.createText({
-		Name = "DetailPower", Parent = detailPanel,
+		Name = "DetailPower", Parent = detailScroll,
 		Text = "Power Score  " .. string.format("%.0f", dragon.powerScore or 0),
 		Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 158),
 		TextSize = 11, Font = Theme.Fonts.Bold, Color = Theme.Colors.GoldBright,
@@ -407,8 +461,8 @@ renderDragonDetail = function(detailPanel, dragon)
 	})
 
 	local abilityPanel = Theme.createFrame({
-		Name = "AbilityPanel", Parent = detailPanel,
-		Size = UDim2.new(1, 0, 0, 118), Position = UDim2.fromOffset(0, 178),
+		Name = "AbilityPanel", Parent = detailScroll,
+		Size = UDim2.new(1, 0, 0, 126), Position = UDim2.fromOffset(0, 178),
 		Bg = Theme.Colors.StoneDeep, Corner = Theme.Corner.Medium, ZIndex = 8,
 	})
 	Theme.stroke(abilityPanel, Theme.Colors.Crystal, 1.5, 0.35)
@@ -455,22 +509,22 @@ renderDragonDetail = function(detailPanel, dragon)
 		Theme.createText({
 			Name = "AbilityProgress", Parent = abilityPanel,
 			Text = string.format("Progress %d / %d  •  Now: %s", progress, required, tostring(ability.currentValueText or "—")),
-			Size = UDim2.new(1, -16, 0, 16), Position = UDim2.fromOffset(8, 92),
+			Size = UDim2.new(1, -16, 0, 14), Position = UDim2.fromOffset(8, 92),
 			TextSize = 10, Font = Theme.Fonts.Body, Color = Theme.Colors.TextMuted, ZIndex = 9,
 		})
 		if ability.nextValueText then
 			Theme.createText({
 				Name = "AbilityNext", Parent = abilityPanel,
 				Text = "Next: " .. ability.nextValueText,
-				Size = UDim2.new(1, -16, 0, 14), Position = UDim2.fromOffset(8, 104),
+				Size = UDim2.new(1, -16, 0, 14), Position = UDim2.fromOffset(8, 108),
 				TextSize = 10, Font = Theme.Fonts.Body, Color = Theme.Colors.TextMuted, ZIndex = 9,
 			})
 		end
 	end
 
 	local statsPanel = Theme.createFrame({
-		Name = "StatsPanel", Parent = detailPanel,
-		Size = UDim2.new(1, 0, 0, 118), Position = UDim2.fromOffset(0, 304),
+		Name = "StatsPanel", Parent = detailScroll,
+		Size = UDim2.new(1, 0, 0, 118), Position = UDim2.fromOffset(0, 312),
 		Bg = Theme.Colors.StoneDeep, Corner = Theme.Corner.Medium, ZIndex = 8,
 	})
 	Theme.stroke(statsPanel, Theme.Colors.Gold, 1, 0.5)
@@ -648,7 +702,7 @@ local function renderDragonsTab()
 		local row = Theme.createListRow(listScroll, {
 			Name = "DragonRow_" .. tostring(dragon.id),
 			Text = "",
-			Height = 56,
+			Height = 68,
 			LayoutOrder = index,
 			ZIndex = 8,
 			OnClick = function()
@@ -757,14 +811,18 @@ renderCodexDetail = function(detailPanel, speciesId)
 		iconImage.ImageTransparency = 0.35
 	end
 
-	Theme.createText({
+	local codexNameLabel = Theme.createText({
 		Name = "DetailName", Parent = detailPanel,
 		Text = discovered and displayName or "???",
-		Size = UDim2.new(1, 0, 0, 26), Position = UDim2.fromOffset(0, 96),
+		Size = UDim2.new(1, -12, 0, 26), Position = UDim2.fromOffset(6, 96),
 		TextSize = 20, Font = Theme.Fonts.Title,
 		Color = discovered and Theme.Colors.TextLight or Theme.Colors.TextMuted,
 		XAlign = Enum.TextXAlignment.Center, ZIndex = 9,
 	})
+	codexNameLabel.TextScaled = true
+	local codexNameSizeConstraint = Instance.new("UITextSizeConstraint")
+	codexNameSizeConstraint.MaxTextSize = 20
+	codexNameSizeConstraint.Parent = codexNameLabel
 
 	Theme.createText({
 		Name = "DetailStatus", Parent = detailPanel,
@@ -962,13 +1020,17 @@ renderInventoryDetail = function(detailPanel, item)
 	iconFrame.Position = UDim2.new(0.5, 0, 0, 0)
 	iconFrame.AnchorPoint = Vector2.new(0.5, 0)
 
-	Theme.createText({
+	local itemNameLabel = Theme.createText({
 		Name = "DetailName", Parent = detailPanel,
 		Text = item.displayName,
-		Size = UDim2.new(1, 0, 0, 26), Position = UDim2.fromOffset(0, 96),
+		Size = UDim2.new(1, -12, 0, 26), Position = UDim2.fromOffset(6, 96),
 		TextSize = 20, Font = Theme.Fonts.Title, Color = Theme.Colors.TextLight,
 		XAlign = Enum.TextXAlignment.Center, ZIndex = 9,
 	})
+	itemNameLabel.TextScaled = true
+	local itemNameSizeConstraint = Instance.new("UITextSizeConstraint")
+	itemNameSizeConstraint.MaxTextSize = 20
+	itemNameSizeConstraint.Parent = itemNameLabel
 
 	Theme.createText({
 		Name = "DetailMeta", Parent = detailPanel,
