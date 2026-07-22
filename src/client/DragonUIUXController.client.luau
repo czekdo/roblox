@@ -79,13 +79,13 @@ navLayout.Parent = nav
 -- the owning script's RegisterPanel call — that says what a panel's opener/closer are,
 -- not a second copy of opener/closer name strings here.
 local windows = {
-	EggShop = { label = "Egg Shop", gui = "EggShopUI", panel = "EggShopPanel", dim = "DimBackground", icon = Theme.Icons.Egg },
-	Dragons = { label = "Dragons", gui = "DragonRosterUI", panel = "DragonRosterPanel", dim = "DimBackground", icon = Theme.Icons.Dragon },
-	DragonMerge = { label = "Merge", gui = "DragonMergeUI", panel = "DragonMergePanel", dim = "DimBackground", icon = Theme.Icons.Merge },
-	DragonTraining = { label = "Academy", gui = "DragonTrainingUI", panel = "DragonTrainingPanel", dim = "DimBackground", icon = Theme.Icons.Book },
-	Workshop = { label = "Workshop", gui = "WorkshopCraftUI", panel = "CraftPanel", dim = "DimBackground", icon = Theme.Icons.Hammer, enabledKey = true },
-	Buildings = { label = "Buildings", gui = "BuildingUpgradeUI", panel = "BuildingPanel", dim = "DimBackground", icon = Theme.Icons.House },
-	DailyQuests = { label = "Quests", gui = "DailyQuestUI", panel = "QuestPanel", dim = "DimBackground", icon = Theme.Icons.Scroll },
+	EggShop = { label = "Egg Shop", gui = "EggShopUI", panel = "EggShopPanel", dim = "DimBackground", icon = "rbxassetid://102811056941527" },
+	Dragons = { label = "Dragons", gui = "DragonRosterUI", panel = "DragonRosterPanel", dim = "DimBackground", icon = "rbxassetid://88858917491025" },
+	DragonMerge = { label = "Merge", gui = "DragonMergeUI", panel = "DragonMergePanel", dim = "DimBackground", icon = "rbxassetid://106637596686988" },
+	DragonTraining = { label = "Academy", gui = "DragonTrainingUI", panel = "DragonTrainingPanel", dim = "DimBackground", icon = "rbxassetid://114554234177460" },
+	Workshop = { label = "Workshop", gui = "WorkshopCraftUI", panel = "CraftPanel", dim = "DimBackground", icon = "rbxassetid://108036254615370", enabledKey = true },
+	Buildings = { label = "Buildings", gui = "BuildingUpgradeUI", panel = "BuildingPanel", dim = "DimBackground", icon = "rbxassetid://136390569268484" },
+	DailyQuests = { label = "Quests", gui = "DailyQuestUI", panel = "QuestPanel", dim = "DimBackground", icon = "rbxassetid://74749927143995" },
 	Achievements = { label = "Achievements", gui = "AchievementUI", panel = "AchievementPanel", dim = "DimBackground", icon = Theme.Icons.Trophy },
 	Rebirth = { label = "Ascension", gui = "RebirthUI", panel = "RebirthPanel", dim = "DimBackground", icon = Theme.Icons.Rebirth },
 	-- Not part of navOrder (no nav button): opened only by its own popup event, but registered

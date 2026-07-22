@@ -32,6 +32,7 @@ local function buildPayload(player, message)
 			description = recipe.Description,
 			cost = recipe.Cost,
 			tier = recipe.Tier,
+			icon = recipe.Icon,
 			rewardText = recipe.Reward.Text,
 		})
 	end

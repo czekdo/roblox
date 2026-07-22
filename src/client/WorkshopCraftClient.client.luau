@@ -92,7 +92,7 @@ local function updateDetailPanel(recipe)
 		return
 	end
 
-	if detailIcon then detailIcon.Image = Theme.Icons.Hammer end
+	if detailIcon then detailIcon.Image = recipe.icon or Theme.Icons.Hammer end
 	if detailNameLabel then detailNameLabel.Text = recipe.displayName end
 	if detailTierLabel then
 		detailTierLabel.Text = "Tier " .. tostring(recipe.tier or 1)

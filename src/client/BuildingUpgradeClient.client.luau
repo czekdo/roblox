@@ -23,12 +23,12 @@ local state = {
 }
 
 local BUILDING_ICONS = {
-	DragonNest = Theme.Icons.Dragon,
-	DragonStorage = Theme.Icons.Backpack,
-	CrystalStorage = Theme.Icons.Crystal,
-	DragonAcademy = Theme.Icons.Book,
-	Workshop = Theme.Icons.Hammer,
-	EggHatchery = Theme.Icons.Egg,
+	DragonNest = "rbxassetid://103635508813571",
+	DragonStorage = "rbxassetid://89655786283734",
+	CrystalStorage = "rbxassetid://84700457208599",
+	DragonAcademy = "rbxassetid://138454988734016",
+	Workshop = "rbxassetid://108036254615370",
+	EggHatchery = "rbxassetid://91171395264610",
 }
 
 local BUILDING_DESCRIPTIONS = {

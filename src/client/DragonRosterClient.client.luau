@@ -8,7 +8,10 @@ local DragonAbilityConfig = require(ReplicatedStorage:WaitForChild("DragonAbilit
 local DragonEggConfig = require(ReplicatedStorage:WaitForChild("DragonEggConfig"))
 local DragonInventoryConfig = require(ReplicatedStorage:WaitForChild("DragonInventoryConfig"))
 local LeaderboardConfig = require(ReplicatedStorage:WaitForChild("LeaderboardConfig"))
-local RequestLeaderboard = ReplicatedStorage:WaitForChild("LeaderboardEvents"):WaitForChild("RequestLeaderboard")
+local WeeklyLeaderboardConfig = require(ReplicatedStorage:WaitForChild("WeeklyLeaderboardConfig"))
+local LeaderboardEventsFolder = ReplicatedStorage:WaitForChild("LeaderboardEvents")
+local RequestLeaderboard = LeaderboardEventsFolder:WaitForChild("RequestLeaderboard")
+local RequestWeeklyLeaderboard = LeaderboardEventsFolder:WaitForChild("RequestWeeklyLeaderboard")
 local InventoryEvents = ReplicatedStorage:WaitForChild("InventoryEvents")
 local RequestInventoryData = InventoryEvents:WaitForChild("RequestInventoryData")
 local UseInventoryItem = InventoryEvents:WaitForChild("UseInventoryItem")
@@ -60,6 +63,26 @@ local selectedSpeciesId
 local PANEL_WIDTH = 960
 local PANEL_HEIGHT = 600
 local LIST_WIDTH_SCALE = 0.36
+
+-- The species-art icons (from the egg-hatch reveal set) are round badges that already carry their
+-- own border/background baked into the image. Theme.createIconFrame's default rounded-SQUARE frame
+-- (sized for plain glyph icons like Theme.Icons.Dragon) left the frame's own square-ish background
+-- and gold stroke visible around the small round artwork - a mismatched "frame within a frame" look.
+-- Forcing the frame fully round and letting the image fill almost all of it matches how these same
+-- badges already render cleanly on the sidebar nav buttons.
+local function createSpeciesIconFrame(parent, dragonType, size, zIndex)
+	local speciesIcon = DragonEggConfig.GetSpeciesIcon(dragonType)
+	if not speciesIcon then
+		return Theme.createIconFrame(parent, Theme.Icons.Dragon, size, zIndex)
+	end
+	local iconFrame, iconImage = Theme.createIconFrame(parent, speciesIcon, size, zIndex)
+	local corner = iconFrame:FindFirstChildOfClass("UICorner")
+	if corner then
+		corner.CornerRadius = Theme.Corner.Pill
+	end
+	iconImage.Size = UDim2.fromOffset(size - 6, size - 6)
+	return iconFrame, iconImage
+end
 
 local sidebarItems = {
 	{ id = "Dragons", label = "Dragons", icon = Theme.Icons.Dragon },
@@ -283,9 +306,8 @@ local function populateDragonListRow(row, dragon)
 	-- Y=16). The three text lines below are laid out to end at coded Y=52 (final Y=60), 8px clear of
 	-- the row's true 68px bottom edge - previously they were tuned for a 56px row assuming no such
 	-- shift, so the last line ("In Storage" etc.) rendered 8px past the row's own border.
-	local iconFrame, iconImage = Theme.createIconFrame(row, Theme.Icons.Dragon, 36, 8)
+	local iconFrame, iconImage = createSpeciesIconFrame(row, dragon.dragonType, 36, 8)
 	iconFrame.Position = UDim2.fromOffset(6, 8)
-	iconImage.ImageColor3 = rarityColor
 
 	Theme.createText({
 		Name = "RowName", Parent = row,
@@ -415,10 +437,9 @@ renderDragonDetail = function(detailPanel, dragon)
 	detailScroll.ZIndex = 8
 	detailScroll.Parent = detailPanel
 
-	local iconFrame, iconImage = Theme.createIconFrame(detailScroll, Theme.Icons.Dragon, 88, 8)
+	local iconFrame, iconImage = createSpeciesIconFrame(detailScroll, dragon.dragonType, 88, 8)
 	iconFrame.Position = UDim2.new(0.5, 0, 0, 0)
 	iconFrame.AnchorPoint = Vector2.new(0.5, 0)
-	iconImage.ImageColor3 = rarityColor
 
 	local detailNameLabel = Theme.createText({
 		Name = "DetailName", Parent = detailScroll,
@@ -722,8 +743,13 @@ local function populateCodexListRow(row, speciesId)
 	local discovered = isSpeciesDiscovered(speciesId)
 	local displayName = DragonEggConfig.GetDragonDisplayName(speciesId)
 	local speciesConfig = DragonAbilityConfig.GetSpeciesConfig(speciesId)
-	local iconFrame, iconImage = Theme.createIconFrame(row, Theme.Icons.Dragon, 36, 8)
-	iconFrame.Position = UDim2.fromOffset(6, 8)
+	-- Row is 52px tall, but Theme.createListRow's own 8px top UIPadding shifts every
+	-- offset-positioned child down by 8px (same effect confirmed in the Dragons tab list rows) -
+	-- so content coded to end at Y=44 actually rendered at Y=52, flush with (and spilling past)
+	-- the row's true bottom edge. Shifting everything up by 8 leaves the same clear margin the
+	-- Dragons tab rows use.
+	local iconFrame, iconImage = createSpeciesIconFrame(row, speciesId, 36, 8)
+	iconFrame.Position = UDim2.fromOffset(6, 0)
 	if not discovered then
 		iconImage.ImageTransparency = 0.45
 	end
@@ -731,7 +757,7 @@ local function populateCodexListRow(row, speciesId)
 	Theme.createText({
 		Name = "RowName", Parent = row,
 		Text = discovered and displayName or "???",
-		Size = UDim2.new(1, -58, 0, 18), Position = UDim2.fromOffset(50, 8),
+		Size = UDim2.new(1, -58, 0, 18), Position = UDim2.fromOffset(50, 0),
 		TextSize = 13, Font = Theme.Fonts.Bold,
 		Color = discovered and Theme.Colors.TextLight or Theme.Colors.TextMuted,
 		Wrapped = false, Truncate = Enum.TextTruncate.AtEnd, ZIndex = 9,
@@ -740,7 +766,7 @@ local function populateCodexListRow(row, speciesId)
 	Theme.createText({
 		Name = "RowMeta", Parent = row,
 		Text = discovered and (speciesConfig and speciesConfig.AbilityName or "Ability") or "Undiscovered",
-		Size = UDim2.new(1, -58, 0, 16), Position = UDim2.fromOffset(50, 28),
+		Size = UDim2.new(1, -58, 0, 16), Position = UDim2.fromOffset(50, 20),
 		TextSize = 11, Font = Theme.Fonts.Regular,
 		Color = discovered and Theme.Colors.Crystal or Theme.Colors.TextMuted, ZIndex = 9,
 	})
@@ -759,7 +785,19 @@ end
 
 local function highlightCodexRows()
 	for speciesId, row in codexRows do
-		Theme.setListRowSelected(row, speciesId == selectedSpeciesId, Theme.Colors.Crystal)
+		local isSelected = speciesId == selectedSpeciesId
+		local discovered = isSpeciesDiscovered(speciesId)
+
+		-- Same fix as the Dragons tab: a flat Crystal selected-background exactly matched
+		-- RowMeta's own Crystal text color, making the ability-name line disappear on selection.
+		-- Blending toward navy keeps the accent while guaranteeing contrast for light text.
+		local selectedBg = Theme.Colors.Crystal:Lerp(Theme.Colors.NavyEdge, 0.55)
+		Theme.setListRowSelected(row, isSelected, selectedBg)
+
+		local rowMeta = row:FindFirstChild("RowMeta")
+		if rowMeta then
+			rowMeta.TextColor3 = isSelected and Theme.Colors.TextLight or (discovered and Theme.Colors.Crystal or Theme.Colors.TextMuted)
+		end
 	end
 end
 
@@ -804,7 +842,7 @@ renderCodexDetail = function(detailPanel, speciesId)
 		end
 	end
 
-	local iconFrame, iconImage = Theme.createIconFrame(detailPanel, Theme.Icons.Dragon, 88, 8)
+	local iconFrame, iconImage = createSpeciesIconFrame(detailPanel, speciesId, 88, 8)
 	iconFrame.Position = UDim2.new(0.5, 0, 0, 0)
 	iconFrame.AnchorPoint = Vector2.new(0.5, 0)
 	if not discovered then
@@ -963,13 +1001,15 @@ end
 
 local function populateInventoryListRow(row, item)
 	row.Text = ""
+	-- Same 8px UIPadding shift as the Codex/Dragons rows - offsets moved up to leave clear margin
+	-- above the row's true 52px bottom edge instead of spilling past it.
 	local iconFrame = Theme.createIconFrame(row, Theme.Icons.Backpack, 36, 8)
-	iconFrame.Position = UDim2.fromOffset(6, 8)
+	iconFrame.Position = UDim2.fromOffset(6, 0)
 
 	Theme.createText({
 		Name = "RowName", Parent = row,
 		Text = item.displayName,
-		Size = UDim2.new(1, -58, 0, 18), Position = UDim2.fromOffset(50, 6),
+		Size = UDim2.new(1, -58, 0, 18), Position = UDim2.fromOffset(50, 0),
 		TextSize = 13, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextLight,
 		Wrapped = false, Truncate = Enum.TextTruncate.AtEnd, ZIndex = 9,
 	})
@@ -977,14 +1017,17 @@ local function populateInventoryListRow(row, item)
 	Theme.createText({
 		Name = "RowMeta", Parent = row,
 		Text = "Owned x" .. tostring(item.count),
-		Size = UDim2.new(1, -58, 0, 16), Position = UDim2.fromOffset(50, 26),
+		Size = UDim2.new(1, -58, 0, 16), Position = UDim2.fromOffset(50, 20),
 		TextSize = 11, Font = Theme.Fonts.Regular, Color = Theme.Colors.TextGold, ZIndex = 9,
 	})
 end
 
 local function highlightInventoryRows()
+	-- Same blended selected-background as the Dragons/Codex tabs, for consistency and so any
+	-- future text color on these rows can't accidentally match a flat Crystal fill.
+	local selectedBg = Theme.Colors.Crystal:Lerp(Theme.Colors.NavyEdge, 0.55)
 	for itemId, row in inventoryRows do
-		Theme.setListRowSelected(row, itemId == selectedItemId, Theme.Colors.Crystal)
+		Theme.setListRowSelected(row, itemId == selectedItemId, selectedBg)
 	end
 end
 
@@ -1101,6 +1144,19 @@ end
 
 local selectedLeaderboardCategory = LeaderboardConfig.Categories[1].Key
 
+local WEEKLY_CATEGORY_KEY = "Weekly"
+
+local function formatCountdown(seconds)
+	seconds = math.max(0, math.floor(seconds or 0))
+	local days = math.floor(seconds / 86400)
+	local hours = math.floor((seconds % 86400) / 3600)
+	if days > 0 then
+		return string.format("%dd %dh", days, hours)
+	end
+	local minutes = math.floor((seconds % 3600) / 60)
+	return string.format("%dh %dm", hours, minutes)
+end
+
 local function renderLeaderboardsTab()
 	clearContent()
 	setHeader("LEADERBOARDS", "Top players in the kingdom")
@@ -1116,6 +1172,16 @@ local function renderLeaderboardsTab()
 	categoryLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	categoryLayout.Parent = categoryBar
 
+	Theme.createButton({
+		Name = "Category_Weekly", Parent = categoryBar, Text = "Weekly Essence",
+		Size = UDim2.fromOffset(160, 40), TextSize = 13, LayoutOrder = 0,
+		Bg = selectedLeaderboardCategory == WEEKLY_CATEGORY_KEY and Theme.Colors.Gold or Theme.Colors.NavyEdge,
+		OnClick = function()
+			selectedLeaderboardCategory = WEEKLY_CATEGORY_KEY
+			renderLeaderboardsTab()
+		end,
+	})
+
 	for i, category in LeaderboardConfig.Categories do
 		local btn = Theme.createButton({
 			Name = "Category_" .. category.Key, Parent = categoryBar, Text = category.Name,
@@ -1128,10 +1194,21 @@ local function renderLeaderboardsTab()
 		})
 	end
 
+	local isWeekly = selectedLeaderboardCategory == WEEKLY_CATEGORY_KEY
+	local infoLabel = nil
+	if isWeekly then
+		infoLabel = Theme.createText({
+			Name = "WeeklyInfo", Parent = contentFrame, Text = "Loading this week's standings...",
+			Size = UDim2.new(1, -12, 0, 20), Position = UDim2.fromOffset(6, 48),
+			TextSize = 13, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextGold,
+			XAlign = Enum.TextXAlignment.Left, ZIndex = 8,
+		})
+	end
+
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "LeaderboardScroll"
-	scroll.Size = UDim2.new(1, -12, 1, -58)
-	scroll.Position = UDim2.fromOffset(6, 52)
+	scroll.Size = isWeekly and UDim2.new(1, -12, 1, -80) or UDim2.new(1, -12, 1, -58)
+	scroll.Position = UDim2.fromOffset(6, isWeekly and 74 or 52)
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
 	scroll.ScrollBarThickness = 10
@@ -1154,7 +1231,70 @@ local function renderLeaderboardsTab()
 	})
 
 	local requestToken = refreshToken
+
+	local function renderEntries(entries, myUserId)
+		for _, entry in entries do
+			local rank = entry.Rank or entry.rank
+			local isMe = entry.UserId == myUserId
+			local tier = isWeekly and WeeklyLeaderboardConfig.GetRewardForRank(rank) or nil
+			local row = Theme.createListRow(scroll, {
+				Name = "Rank" .. rank, Height = 44, LayoutOrder = rank, ZIndex = 8,
+				Bg = isMe and Theme.Colors.Gold or Theme.Colors.NavyEdge,
+			})
+			Theme.createText({
+				Name = "RankLabel", Parent = row, Text = "#" .. rank,
+				Size = UDim2.fromOffset(40, 28), Position = UDim2.fromOffset(0, 0),
+				TextSize = 14, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextGold,
+				XAlign = Enum.TextXAlignment.Left, ZIndex = 9,
+			})
+			Theme.createText({
+				Name = "NameLabel", Parent = row,
+				Text = entry.DisplayName .. (isMe and " (You)" or "") .. (tier and ("  •  " .. tier.Label) or ""),
+				Size = UDim2.new(1, -140, 0, 28), Position = UDim2.fromOffset(44, 0),
+				TextSize = 14, Font = Theme.Fonts.Body, Color = Theme.Colors.TextLight,
+				XAlign = Enum.TextXAlignment.Left, ZIndex = 9,
+			})
+			Theme.createText({
+				Name = "ValueLabel", Parent = row, Text = Theme.formatCompact(entry.Value),
+				Size = UDim2.fromOffset(90, 28), Position = UDim2.new(1, -90, 0, 0),
+				TextSize = 14, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextLight,
+				XAlign = Enum.TextXAlignment.Right, ZIndex = 9,
+			})
+		end
+	end
+
 	task.spawn(function()
+		if isWeekly then
+			local ok, result = pcall(function()
+				return RequestWeeklyLeaderboard:InvokeServer()
+			end)
+			if requestToken ~= refreshToken or not scroll.Parent then
+				return
+			end
+			loadingLabel:Destroy()
+			if infoLabel and infoLabel.Parent then
+				local resetText = ok and typeof(result) == "table"
+					and ("Resets in " .. formatCountdown(result.secondsUntilReset))
+					or "Resets weekly"
+				local mineText = ok and typeof(result) == "table"
+					and ("  •  Your essence this week: " .. Theme.formatCompact(result.myWeeklyEssence or 0))
+					or ""
+				infoLabel.Text = resetText .. mineText
+			end
+			if not ok or typeof(result) ~= "table" or typeof(result.entries) ~= "table" or #result.entries == 0 then
+				Theme.createEmptyState(
+					scroll,
+					Theme.Icons.Trophy,
+					"No Weekly Standings Yet",
+					"Earn Dragon Essence this week to climb the board and win Gems + Essence at reset.",
+					8
+				)
+				return
+			end
+			renderEntries(result.entries, player.UserId)
+			return
+		end
+
 		local ok, result = pcall(function()
 			return RequestLeaderboard:InvokeServer(selectedLeaderboardCategory)
 		end)
@@ -1172,31 +1312,12 @@ local function renderLeaderboardsTab()
 			)
 			return
 		end
+		local entries = {}
 		for rank, entry in result.entries do
-			local isMe = entry.UserId == player.UserId
-			local row = Theme.createListRow(scroll, {
-				Name = "Rank" .. rank, Height = 44, LayoutOrder = rank, ZIndex = 8,
-				Bg = isMe and Theme.Colors.Gold or Theme.Colors.NavyEdge,
-			})
-			Theme.createText({
-				Name = "RankLabel", Parent = row, Text = "#" .. rank,
-				Size = UDim2.fromOffset(40, 28), Position = UDim2.fromOffset(0, 0),
-				TextSize = 14, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextGold,
-				XAlign = Enum.TextXAlignment.Left, ZIndex = 9,
-			})
-			Theme.createText({
-				Name = "NameLabel", Parent = row, Text = entry.DisplayName .. (isMe and " (You)" or ""),
-				Size = UDim2.new(1, -140, 0, 28), Position = UDim2.fromOffset(44, 0),
-				TextSize = 14, Font = Theme.Fonts.Body, Color = Theme.Colors.TextLight,
-				XAlign = Enum.TextXAlignment.Left, ZIndex = 9,
-			})
-			Theme.createText({
-				Name = "ValueLabel", Parent = row, Text = Theme.formatCompact(entry.Value),
-				Size = UDim2.fromOffset(90, 28), Position = UDim2.new(1, -90, 0, 0),
-				TextSize = 14, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextLight,
-				XAlign = Enum.TextXAlignment.Right, ZIndex = 9,
-			})
+			entry.Rank = rank
+			table.insert(entries, entry)
 		end
+		renderEntries(entries, player.UserId)
 	end)
 end
 

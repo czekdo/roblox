@@ -379,10 +379,24 @@ local function canAffordEgg(eggInfo)
 	if eggInfo.Reserved then
 		return false
 	end
+	if eggInfo.IsFeatured and not DragonEggConfig.IsFeaturedEggActive() then
+		return false
+	end
 	if isGemEgg(eggInfo) then
 		return getCurrentGems() >= eggInfo.GemCost
 	end
 	return getCurrentEssence() >= eggInfo.Cost
+end
+
+local function formatFeaturedCountdown(seconds)
+	seconds = math.max(0, math.floor(seconds or 0))
+	local days = math.floor(seconds / 86400)
+	local hours = math.floor((seconds % 86400) / 3600)
+	if days > 0 then
+		return string.format("%dd %dh", days, hours)
+	end
+	local minutes = math.floor((seconds % 3600) / 60)
+	return string.format("%dh %dm", hours, minutes)
 end
 
 local EGG_SHOP_GOLD = Color3.fromRGB(235, 188, 82)
@@ -547,6 +561,11 @@ local function updateEggShopCard(eggType)
 	local owned = ownedCounts[eggType] or (stats.OwnedEggs and stats.OwnedEggs[eggType]) or 0
 	cardData.cost.Text = getEggCostText(eggInfo)
 	cardData.owned.Text = "Owned: " .. tostring(owned)
+	if eggInfo.IsFeatured then
+		local active = DragonEggConfig.IsFeaturedEggActive()
+		local countdown = formatFeaturedCountdown(DragonEggConfig.GetFeaturedEggCountdown())
+		cardData.owned.Text = active and ("Ends in " .. countdown) or ("Returns in " .. countdown)
+	end
 	if cardData.cardStroke then
 		cardData.cardStroke.Transparency = canAffordEgg(eggInfo) and 0.35 or 0.55
 	end
@@ -1035,6 +1054,10 @@ local function createEggShopUI()
 			local eggInfo = DragonEggConfig.GetEggTypeInfo(selectedEggType)
 			if eggInfo.Reserved then
 				setEggShopStatus(eggInfo.DisplayName .. " is reserved for future dragons.")
+				return
+			end
+			if eggInfo.IsFeatured and not DragonEggConfig.IsFeaturedEggActive() then
+				setEggShopStatus(eggInfo.DisplayName .. " returns in " .. formatFeaturedCountdown(DragonEggConfig.GetFeaturedEggCountdown()) .. ".")
 				return
 			end
 			if canAffordEgg(eggInfo) then

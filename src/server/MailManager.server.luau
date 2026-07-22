@@ -5,6 +5,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local RewardService = require(ServerScriptService:WaitForChild("RewardService"))
 local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
+local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 
 local MailEvents = ReplicatedStorage:WaitForChild("MailEvents")
 local RequestMailList = MailEvents:WaitForChild("RequestMailList")
@@ -117,12 +118,60 @@ ClaimMail.OnServerEvent:Connect(function(player, mailId)
 			if entry.Reward then
 				RewardService.Grant(player, entry.Reward, { Source = "Mail" })
 			end
+			if entry.Rewards then
+				RewardService.GrantMany(player, entry.Rewards, { Source = "Mail" })
+			end
 			saveDataNow(player)
 			QuestProgressSignal:Fire(player, "ClaimMail", 1)
 			return
 		end
 	end
 end)
+
+-- Delivers mail to a UserId regardless of whether that player is online right now (e.g. weekly
+-- leaderboard reward payouts, which need to reach players who aren't in this server or even
+-- online at all). An online player's in-memory table is the live authoritative copy - writing
+-- straight to the DataStore in that case would get silently clobbered the next time they leave
+-- and saveDataNow() overwrites it with the (now stale) in-memory version. So: if they're online,
+-- append to the live table and let the normal save path persist it; if not, write the DataStore
+-- record directly.
+local function grantMailToUserId(userId, mailEntry)
+	if typeof(mailEntry) ~= "table" or typeof(mailEntry.Id) ~= "string" then
+		return false, "Invalid mail entry"
+	end
+	mailEntry.Claimed = false
+	mailEntry.SentAt = mailEntry.SentAt or os.time()
+
+	local onlinePlayer = Players:GetPlayerByUserId(userId)
+	if onlinePlayer then
+		if not playerMail[onlinePlayer] then
+			loadPlayer(onlinePlayer)
+		end
+		table.insert(playerMail[onlinePlayer], mailEntry)
+		saveDataNow(onlinePlayer)
+		return true
+	end
+
+	if not dataStoreAvailable or not mailStore then
+		return false, "Mail DataStore unavailable"
+	end
+	local ok, err = pcall(function()
+		mailStore:UpdateAsync(tostring(userId), function(existing)
+			local mail = typeof(existing) == "table" and existing or seedWelcomeMail()
+			table.insert(mail, mailEntry)
+			return mail
+		end)
+	end)
+	if not ok then
+		warn("[MailManager] Failed to grant offline mail to", userId, err)
+		return false, err
+	end
+	return true
+end
+
+AdminBridge.register("Mail", {
+	grant = grantMailToUserId,
+})
 
 Players.PlayerAdded:Connect(loadPlayer)
 for _, player in Players:GetPlayers() do

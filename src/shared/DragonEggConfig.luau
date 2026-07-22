@@ -189,6 +189,23 @@ DragonEggConfig.EggTypes = {
 			{ Name = "CelestialDragon", DisplayName = "Celestial Dragon", ModelName = "CelestialDragon", Weight = 1 },
 		},
 	},
+	Featured = {
+		Id = "Featured",
+		DisplayName = "Featured Egg",
+		Cost = 2000,
+		Description = "Limited-time weekly egg with massively boosted odds for a Secret Dragon. Returns to normal odds elsewhere once the week's window closes.",
+		RarityColor = Color3.fromRGB(255, 150, 60),
+		EggColor = Color3.fromRGB(255, 150, 60),
+		SpotColor = Color3.fromRGB(255, 210, 130),
+		GlowColor = Color3.fromRGB(255, 170, 70),
+		Icon = "rbxassetid://78843852703854",
+		IsFeatured = true,
+		Dragons = {
+			{ Name = "BabyGreenDragon", DisplayName = "Baby Green Dragon", ModelName = "ForestDragon", Weight = 1 },
+			{ Name = "BabyRedDragon", DisplayName = "Baby Red Dragon", ModelName = "FireDragon", Weight = 1 },
+			{ Name = "BabyBlueDragon", DisplayName = "Baby Blue Dragon", ModelName = "IceDragon", Weight = 1 },
+		},
+	},
 	Ancient = {
 		Id = "Ancient",
 		DisplayName = "Ancient Egg",
@@ -253,6 +270,52 @@ do
 	end
 end
 
+-- The Featured Egg is the star of the weekly rotation - a much bigger shot at a Secret Dragon than
+-- even the Gem Egg gets, since it's only purchasable during its active window (see
+-- IsFeaturedEggActive below), not something farmable every day.
+local FEATURED_EGG_SECRET_CHANCE = 0.08
+do
+	local eggInfo = DragonEggConfig.EggTypes.Featured
+	local normalWeight = 0
+	for _, dragon in eggInfo.Dragons do
+		normalWeight += dragon.Weight or 1
+	end
+	local secretWeight = normalWeight * FEATURED_EGG_SECRET_CHANCE
+	for _, secret in SECRET_DRAGONS do
+		table.insert(eggInfo.Dragons, {
+			Name = secret.Name,
+			DisplayName = secret.DisplayName,
+			ModelName = secret.ModelName,
+			Weight = secretWeight,
+		})
+	end
+end
+
+-- Featured Egg availability window: active for the first FEATURED_ACTIVE_DAYS of every 7-day
+-- cycle (the same week boundary the weekly leaderboard uses), then hidden for the rest of the
+-- week so it actually feels limited-time rather than a permanent shop fixture. No admin scheduling
+-- needed - it's purely a function of the current time, so it rotates forever on its own.
+local WEEK_SECONDS = 7 * 24 * 60 * 60
+local FEATURED_ACTIVE_DAYS = 5
+local FEATURED_ACTIVE_SECONDS = FEATURED_ACTIVE_DAYS * 24 * 60 * 60
+
+local function getWeekProgressSeconds()
+	return os.time() % WEEK_SECONDS
+end
+
+function DragonEggConfig.IsFeaturedEggActive()
+	return getWeekProgressSeconds() < FEATURED_ACTIVE_SECONDS
+end
+
+-- Seconds remaining in the current state (closes soon if active, opens soon if not).
+function DragonEggConfig.GetFeaturedEggCountdown()
+	local progress = getWeekProgressSeconds()
+	if progress < FEATURED_ACTIVE_SECONDS then
+		return FEATURED_ACTIVE_SECONDS - progress
+	end
+	return WEEK_SECONDS - progress
+end
+
 -- Base combat/harvest power multiplier per species, applied in getDragonStats on top of rarity,
 -- level, and evolution (star) bonuses. Escalates with island unlock order, so a dragon from a
 -- later island is inherently stronger than one from an earlier island at the same level/rarity/
@@ -305,7 +368,7 @@ end
 
 -- Order matches island unlock progression (Forest, Cold, Lava, Storm, Shadow, Crystal, Celestial),
 -- with Fire (not island-gated) placed right after the first two, and Ancient (reserved) last.
-DragonEggConfig.EggOrder = { "Common", "Forest", "Ice", "Fire", "Lava", "Storm", "Shadow", "Crystal", "Celestial", "Gem", "Ancient" }
+DragonEggConfig.EggOrder = { "Common", "Featured", "Forest", "Ice", "Fire", "Lava", "Storm", "Shadow", "Crystal", "Celestial", "Gem", "Ancient" }
 DragonEggConfig.RewardEggOrder = { "Common", "Rare", "Forest", "Ice", "Fire", "Lava", "Storm", "Shadow", "Crystal", "Celestial", "Ancient" }
 
 DragonEggConfig.EggCost = DragonEggConfig.EggTypes.Common.Cost
@@ -322,6 +385,27 @@ DragonEggConfig.DragonTypes = {
 	"CoralOceanDragon",
 	"VipDragon",
 }
+
+-- Same per-species artwork used for the egg-hatch reveal card, shared here so the Dragon Roster
+-- (list rows + detail panel) can show a species-accurate icon instead of one generic dragon icon
+-- on every entry regardless of type.
+DragonEggConfig.SpeciesIcons = {
+	ForestDragon = "rbxassetid://114447555397002",
+	IceDragon = "rbxassetid://79175381980147",
+	FireDragon = "rbxassetid://130942758121470",
+	LavaDragon = "rbxassetid://113492446505113",
+	StormDragon = "rbxassetid://108007135510335",
+	VoidDragon = "rbxassetid://106499302625266",
+	CrystalDragon = "rbxassetid://110920243474682",
+	CelestialDragon = "rbxassetid://137631014879654",
+	PoisonDragon = "rbxassetid://81777420880303",
+	CoralOceanDragon = "rbxassetid://140189536944717",
+	VipDragon = "rbxassetid://117149685970656",
+}
+
+function DragonEggConfig.GetSpeciesIcon(dragonType)
+	return DragonEggConfig.SpeciesIcons[dragonType]
+end
 
 DragonEggConfig.Evolution = {
 	MaxLevel = 5,

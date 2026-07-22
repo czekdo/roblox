@@ -6,6 +6,7 @@ local WorkshopCraftConfig = {
 			Description = "25% essence gain for 10 minutes.",
 			Tier = 1,
 			Cost = 150,
+			Icon = "rbxassetid://116968617661221",
 			Reward = { Type = "InventoryItem", ItemId = "EssenceBoost", Amount = 1, Text = "+1 Essence Boost Potion" },
 		},
 		{
@@ -14,6 +15,7 @@ local WorkshopCraftConfig = {
 			Description = "Instantly grants 40 Dragon Essence.",
 			Tier = 1,
 			Cost = 100,
+			Icon = "rbxassetid://131747250026508",
 			-- Was Amount = 150 - a strictly profitable craft loop (100 cost, 150 back, infinitely
 			-- repeatable). Every other DragonEssence-reward recipe returns ~35-50% of its cost as a
 			-- minor essence sink; matching that here instead of a free-money exploit.
