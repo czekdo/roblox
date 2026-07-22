@@ -75,11 +75,16 @@ AchievementConfig.Achievements = {
 	{ Id = "Discover10Species", Category = "Collection", Title = "Naturalist", Description = "Discover 10 Dragon Species", Stat = "SpeciesDiscovered", Target = 10, IconKey = "Book", Reward = essenceReward(800) },
 	{ Id = "Discover25Species", Category = "Collection", Title = "Dragon Scholar", Description = "Discover 25 Species", Stat = "SpeciesDiscovered", Target = 25, IconKey = "Book", Reward = essenceReward(3000) },
 	{ Id = "CompleteCodex", Category = "Collection", Title = "Codex Master", Description = "Complete the Codex", Stat = "CompleteCodex", Target = 1, IconKey = "Book", Reward = titleReward("CodexMaster", "Codex Master") },
+	{ Id = "FindSecretDragon", Category = "Collection", Title = "Something Special", Description = "Hatch a Secret Dragon", Stat = "SecretDragonsFound", Target = 1, IconKey = "Star", Hidden = true, Reward = gemReward(200, "+200 Gems") },
+	{ Id = "FindAllSecretDragons", Category = "Collection", Title = "Legend Hunter", Description = "Hatch every Secret Dragon", Stat = "SecretDragonsFound", Target = 2, IconKey = "Star", Hidden = true, Reward = titleReward("LegendHunter", "Legend Hunter") },
 
 	-- Resources
 	{ Id = "Essence10K", Category = "Resources", Title = "Essence Gatherer", Description = "Collect 10,000 Dragon Essence", Stat = "LifetimeEssence", Target = 10000, IconKey = "Crystal", Reward = essenceReward(500) },
 	{ Id = "Essence100K", Category = "Resources", Title = "Essence Hoarder", Description = "Collect 100,000 Dragon Essence", Stat = "LifetimeEssence", Target = 100000, IconKey = "Crystal", Reward = essenceReward(2500) },
 	{ Id = "Essence1M", Category = "Resources", Title = "Essence Tycoon", Description = "Collect 1,000,000 Dragon Essence", Stat = "LifetimeEssence", Target = 1000000, IconKey = "Crystal", Reward = gemReward(120, "+120 Gems") },
+	{ Id = "SellFirstDragon", Category = "Resources", Title = "Cleaning House", Description = "Sell your first Dragon", Stat = "DragonsSold", Target = 1, IconKey = "Backpack", Reward = essenceReward(150) },
+	{ Id = "Sell25Dragons", Category = "Resources", Title = "Merchant", Description = "Sell 25 Dragons", Stat = "DragonsSold", Target = 25, IconKey = "Backpack", Reward = essenceReward(1500) },
+	{ Id = "Sell100Dragons", Category = "Resources", Title = "Dragon Tycoon", Description = "Sell 100 Dragons", Stat = "DragonsSold", Target = 100, IconKey = "Backpack", Reward = gemReward(50, "+50 Gems") },
 
 	-- Miscellaneous
 	{ Id = "Play1Hour", Category = "Miscellaneous", Title = "Settled In", Description = "Play for 1 hour", Stat = "PlayTimeSeconds", Target = 3600, IconKey = "Trophy", Reward = essenceReward(400) },

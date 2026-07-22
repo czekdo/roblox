@@ -21,8 +21,20 @@ local QuestEvents = ReplicatedStorage:WaitForChild("QuestEvents")
 local QuestProgressSignal = QuestEvents:WaitForChild("QuestProgressSignal")
 
 local DATASTORE_NAME = AchievementConfig.DataStoreName
-local PURCHASABLE_EGG_TYPES = { "Common", "Forest", "Ice", "Fire", "Crystal" }
+-- Derived from DragonEggConfig (not hardcoded) so "open every egg type" stays correct as new eggs
+-- are added - a hardcoded list here previously went stale when Lava/Storm/Shadow/Celestial eggs
+-- were added, letting the achievement complete without ever requiring the new island eggs.
+local PURCHASABLE_EGG_TYPES = {}
+for _, eggId in DragonEggConfig.EggOrder do
+	local info = DragonEggConfig.EggTypes[eggId]
+	-- GemCost eggs (e.g. the Gem Egg) are excluded: completing a free achievement shouldn't require
+	-- spending premium currency.
+	if info and not info.Reserved and not info.RewardOnly and not info.GemCost then
+		table.insert(PURCHASABLE_EGG_TYPES, eggId)
+	end
+end
 local FIXED_BUILDINGS = { "EggHatchery", "DragonNest", "DragonStorage", "DragonAcademy", "CrystalStorage", "Workshop" }
+local SECRET_DRAGON_MODEL_NAMES = { PoisonDragon = true, CoralOceanDragon = true }
 
 local achievementStore = nil
 local dataStoreAvailable = false
@@ -62,12 +74,15 @@ local function createDefaultData()
 			IslandsUnlocked = 0,
 			MaxIslandIndex = 0,
 			SpeciesDiscovered = 0,
+			SecretDragonsFound = 0,
+			DragonsSold = 0,
 		},
 		sets = {
 			EggTypes = {},
 			Islands = {},
 			Species = {},
 			Rarities = {},
+			SecretDragons = {},
 		},
 		completed = {},
 		claimed = {},
@@ -173,6 +188,10 @@ local function getProgressValue(player, data, achievement)
 		return stats.PlayTimeSeconds or 0
 	elseif stat == "LoginDays" then
 		return stats.LoginDays or 0
+	elseif stat == "SecretDragonsFound" then
+		return stats.SecretDragonsFound or 0
+	elseif stat == "DragonsSold" then
+		return stats.DragonsSold or 0
 	end
 	return 0
 end
@@ -241,6 +260,7 @@ local function queueSave(player)
 						Islands = setToList(data.sets.Islands),
 						Species = setToList(data.sets.Species),
 						Rarities = setToList(data.sets.Rarities),
+						SecretDragons = setToList(data.sets.SecretDragons),
 					},
 					completed = data.completed,
 					claimed = data.claimed,
@@ -312,6 +332,9 @@ local function normalizeLoadedData(raw)
 		for _, rarity in typeof(raw.sets.Rarities) == "table" and raw.sets.Rarities or {} do
 			setInSet(data.sets.Rarities, rarity)
 			data.sets.Rarities[rarity] = true
+		end
+		for _, speciesId in typeof(raw.sets.SecretDragons) == "table" and raw.sets.SecretDragons or {} do
+			setInSet(data.sets.SecretDragons, speciesId)
 		end
 	end
 	if typeof(raw.completed) == "table" then
@@ -410,8 +433,17 @@ local function handleHatchDragon(player, metadata)
 			if setInSet(data.sets.Species, speciesId) then
 				data.stats.SpeciesDiscovered = countSet(data.sets.Species)
 			end
+			if SECRET_DRAGON_MODEL_NAMES[speciesId] and setInSet(data.sets.SecretDragons, speciesId) then
+				data.stats.SecretDragonsFound = countSet(data.sets.SecretDragons)
+			end
 		end
 	end
+	checkCompletions(player)
+end
+
+local function handleSellDragons(player, count)
+	local data = getData(player)
+	data.stats.DragonsSold = (data.stats.DragonsSold or 0) + math.max(0, math.floor(tonumber(count) or 0))
 	checkCompletions(player)
 end
 
@@ -503,6 +535,8 @@ local function onProgressSignal(player, eventType, amount, metadata)
 		handleLifetimeEssence(player, amount)
 	elseif eventType == "KingdomLevel" then
 		handleKingdomLevel(player, amount)
+	elseif eventType == "SellDragons" then
+		handleSellDragons(player, amount)
 	end
 	queueSave(player)
 end

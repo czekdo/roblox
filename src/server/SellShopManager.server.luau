@@ -10,6 +10,8 @@ local RequestSellableDragons = SellEvents:WaitForChild("RequestSellableDragons")
 local SellDragons = SellEvents:WaitForChild("SellDragons")
 local SellResult = SellEvents:WaitForChild("SellResult")
 
+local AchievementProgressSignal = ReplicatedStorage:WaitForChild("AchievementEvents"):WaitForChild("AchievementProgressSignal")
+
 local MAX_SELL_BATCH = 200
 
 RequestSellableDragons.OnServerInvoke = function(player)
@@ -72,6 +74,7 @@ SellDragons.OnServerEvent:Connect(function(player, dragonIds)
 
 	if soldCount > 0 then
 		AdminBridge.call("Harvest", "adjustEssence", player, totalValue)
+		AchievementProgressSignal:Fire(player, "SellDragons", soldCount)
 	end
 
 	SellResult:FireClient(player, {
