@@ -2822,6 +2822,22 @@ AdminBridge.register("Harvest", {
 		data.mergeStats = sanitizeMergeStats(nil)
 		DragonAbilityService.Clear(player)
 		data.essence = 0
+
+		-- Re-grant the starter dragon so the account actually lands back at a fresh-new-player
+		-- state, matching what spawnPlayerDragons gives on a real first join. Without this, wiping
+		-- mid-session left the admin with zero dragons and no way to get one back short of leaving
+		-- and rejoining (spawnPlayerDragons only runs once per session, gated on data.island already
+		-- being set).
+		local starterRecord = DragonInventoryService.AddOwnedDragon(data, {
+			dragonType = STARTER_DRAGON_TYPE,
+			rarity = "Common",
+			level = 1,
+			evolutionLevel = 0,
+		})
+		starterRecord.isEquipped = true
+		spawnOwnedDragon(player, data, starterRecord, getAdminSpawnPosition(player))
+
+		saveDragonLevels(player)
 		sendUIUpdate(player)
 		sendDragonMergeUpdate(player)
 		return "Harvest runtime wiped"
