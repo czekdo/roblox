@@ -679,8 +679,10 @@ local saveRow = createRow(saveSection, 2, 44)
 registerSearchRow(saveRow, "save reload wipe player data")
 createButton({ Parent = saveRow, Size = UDim2.fromOffset(130, 40), Bg = Colors.Gold, Text = "Save Player", LayoutOrder = 1, OnClick = function() sendAction("SavePlayer") end })
 createButton({ Parent = saveRow, Size = UDim2.fromOffset(130, 40), Bg = Colors.Info, Text = "Reload Player", LayoutOrder = 2, OnClick = function() sendAction("ReloadPlayer") end })
-createButton({ Parent = saveRow, Size = UDim2.fromOffset(130, 40), Bg = Colors.Danger, Text = "Wipe Save", LayoutOrder = 3, OnClick = function() confirmWipe.Visible = true end })
-
+-- Declared before the "Wipe Save" button below - that button's OnClick closure captures
+-- confirmWipe by reference, so if it were declared after (as it was originally), the closure
+-- would resolve it as an undeclared global (nil) instead of this local, erroring on click
+-- ("attempt to index nil with 'Visible'") with no feedback ever reaching the player.
 local confirmWipe = createFrame({ Name = "ConfirmWipe", Parent = panel, Size = UDim2.fromOffset(360, 180), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), Bg = Colors.PanelGlass, BgTransparency = 0.02, Corner = UDim.new(0, 14), Visible = false, ZIndex = 40 })
 stroke(confirmWipe, Colors.Danger, 2, 0.15)
 createText({ Parent = confirmWipe, Text = "Wipe player save?", Size = UDim2.new(1, -24, 0, 30), Position = UDim2.fromOffset(12, 16), TextSize = 18, Color = Colors.GoldBright, ZIndex = 41 })
@@ -690,6 +692,8 @@ confirmRow.Position = UDim2.new(0, 12, 1, -56)
 confirmRow.Size = UDim2.new(1, -24, 0, 44)
 createButton({ Parent = confirmRow, Size = UDim2.new(0.5, -6, 1, 0), Bg = Colors.Row, Text = "Cancel", LayoutOrder = 1, ZIndex = 41, OnClick = function() confirmWipe.Visible = false end })
 createButton({ Parent = confirmRow, Size = UDim2.new(0.5, -6, 1, 0), Bg = Colors.Danger, Text = "Confirm Wipe", LayoutOrder = 2, ZIndex = 41, OnClick = function() confirmWipe.Visible = false; sendAction("WipeSave") end })
+
+createButton({ Parent = saveRow, Size = UDim2.fromOffset(130, 40), Bg = Colors.Danger, Text = "Wipe Save", LayoutOrder = 3, OnClick = function() confirmWipe.Visible = true end })
 
 local debugPage = tabPages.Debug.scroll
 local debugSection = createSection(debugPage, "Live Debug", 1)
