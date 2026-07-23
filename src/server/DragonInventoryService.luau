@@ -344,15 +344,23 @@ function DragonInventoryService.EquipBestDragons(player, data)
 		targetIds[candidates[index].record.id] = true
 	end
 
+	-- Two separate passes, not one combined loop: pairs() over ownedDragonById (a plain dictionary)
+	-- gives no ordering guarantee, so a single pass could visit an "equip this new best dragon" case
+	-- before the "unequip this old weak one" case that's supposed to free its slot. EquipDragon
+	-- rejects when slots are already full, so that ordering accident would silently skip the swap -
+	-- this is why "Equip Best" only sometimes worked. Unequipping everything that needs to go first
+	-- guarantees every slot picked for a new dragon is actually free by the time we try to equip it.
 	local changed = 0
 	for _, record in data.ownedDragonById do
-		local shouldEquip = targetIds[record.id] == true
-		if record.isEquipped and not shouldEquip and not record.isFavorite then
+		if record.isEquipped and not targetIds[record.id] and not record.isFavorite then
 			local ok = DragonInventoryService.UnequipDragon(player, data, record.id)
 			if ok then
 				changed += 1
 			end
-		elseif not record.isEquipped and shouldEquip then
+		end
+	end
+	for _, record in data.ownedDragonById do
+		if not record.isEquipped and targetIds[record.id] == true then
 			local ok = DragonInventoryService.EquipDragon(player, data, record.id)
 			if ok then
 				changed += 1
