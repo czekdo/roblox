@@ -54,6 +54,10 @@ end
 -- player -> { ReferrerUserId = number?, Qualified = boolean }
 local playerLinks = {}
 
+-- player -> last known referral count, so a rate-limited RequestReferralInfo call still gets a
+-- real (if briefly stale) answer instead of falling back to 0.
+local lastKnownReferralCount = {}
+
 local function loadLink(player)
 	local record = { ReferrerUserId = nil, Qualified = false }
 	if dataStoreAvailable then
@@ -87,6 +91,7 @@ end
 
 Players.PlayerRemoving:Connect(function(player)
 	playerLinks[player] = nil
+	lastKnownReferralCount[player] = nil
 end)
 
 local function checkQualification(player)
@@ -191,13 +196,14 @@ end
 
 RequestReferralInfo.OnServerInvoke = function(player)
 	local record = playerLinks[player] or {}
-	local referralCount = 0
-	if dataStoreAvailable and countStore then
+	local referralCount = lastKnownReferralCount[player] or 0
+	if RateLimiter.check(player, "RequestReferralInfo", 3) and dataStoreAvailable and countStore then
 		local ok, count = pcall(function()
 			return countStore:GetAsync(tostring(player.UserId))
 		end)
 		if ok and typeof(count) == "number" then
 			referralCount = count
+			lastKnownReferralCount[player] = count
 		end
 	end
 	return {

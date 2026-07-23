@@ -88,36 +88,53 @@ local function resolveDisplayName(userId)
 	return "Player" .. tostring(userId)
 end
 
+-- GetSortedAsync is one of the pricier DataStore calls, and the result is identical for every
+-- player asking about the same category - so instead of a per-player rate limit (which still lets
+-- N different players each trigger their own fresh read), this is a single shared cache with a
+-- short TTL. Worst case is one real DataStore call per category per CACHE_TTL seconds no matter
+-- how many players have the panel open or how fast a client spams the request.
+local CACHE_TTL = 15
+local leaderboardCache = {}
+
 RequestLeaderboard.OnServerInvoke = function(_player, categoryKey)
 	local category = LeaderboardConfig.GetCategory(categoryKey)
 	if not category then
 		return { entries = {} }
 	end
 
+	local cached = leaderboardCache[category.Key]
+	if cached and (os.clock() - cached.cachedAt) < CACHE_TTL then
+		return cached.result
+	end
+
+	local result
 	if not dataStoreAvailable then
-		return { entries = buildLiveServerFallback(category), liveOnly = true }
+		result = { entries = buildLiveServerFallback(category), liveOnly = true }
+	else
+		local store = orderedStores[category.Key]
+		local ok, pages = pcall(function()
+			return store:GetSortedAsync(false, TOP_N)
+		end)
+		if not ok then
+			warn("[LeaderboardService] GetSortedAsync failed for", category.Key, pages)
+			result = { entries = buildLiveServerFallback(category), liveOnly = true }
+		else
+			local page = pages:GetCurrentPage()
+			local entries = {}
+			for rank, item in page do
+				local userId = tonumber(item.key)
+				table.insert(entries, {
+					UserId = userId,
+					DisplayName = resolveDisplayName(userId),
+					Value = item.value,
+				})
+			end
+			result = { entries = entries, liveOnly = false }
+		end
 	end
 
-	local store = orderedStores[category.Key]
-	local ok, pages = pcall(function()
-		return store:GetSortedAsync(false, TOP_N)
-	end)
-	if not ok then
-		warn("[LeaderboardService] GetSortedAsync failed for", category.Key, pages)
-		return { entries = buildLiveServerFallback(category), liveOnly = true }
-	end
-
-	local page = pages:GetCurrentPage()
-	local entries = {}
-	for rank, item in page do
-		local userId = tonumber(item.key)
-		table.insert(entries, {
-			UserId = userId,
-			DisplayName = resolveDisplayName(userId),
-			Value = item.value,
-		})
-	end
-	return { entries = entries, liveOnly = false }
+	leaderboardCache[category.Key] = { result = result, cachedAt = os.clock() }
+	return result
 end
 
 local function trackPlayer(player)

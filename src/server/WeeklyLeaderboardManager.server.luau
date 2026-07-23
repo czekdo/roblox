@@ -217,8 +217,19 @@ task.spawn(function()
 	end
 end)
 
-RequestWeeklyLeaderboard.OnServerInvoke = function(player)
-	local currentWeekId = WeeklyLeaderboardConfig.GetCurrentWeekId()
+-- Same shared cache as LeaderboardService.RequestLeaderboard: the entries list is identical for
+-- every player, so it's cached once here rather than re-running GetSortedAsync (an expensive
+-- OrderedDataStore call) on every single invoke, no matter how many players spam this request.
+-- Only "entries" is cached - myWeeklyEssence below is per-player and computed fresh every call
+-- (cheap, just an attribute read, no DataStore hit).
+local ENTRIES_CACHE_TTL = 15
+local entriesCache = nil
+
+local function getCachedEntries(currentWeekId)
+	if entriesCache and entriesCache.weekId == currentWeekId and (os.clock() - entriesCache.cachedAt) < ENTRIES_CACHE_TTL then
+		return entriesCache.entries
+	end
+
 	local entries = {}
 	if dataStoreAvailable then
 		local store = getBoardStore(currentWeekId)
@@ -238,6 +249,14 @@ RequestWeeklyLeaderboard.OnServerInvoke = function(player)
 			end
 		end
 	end
+
+	entriesCache = { entries = entries, weekId = currentWeekId, cachedAt = os.clock() }
+	return entries
+end
+
+RequestWeeklyLeaderboard.OnServerInvoke = function(player)
+	local currentWeekId = WeeklyLeaderboardConfig.GetCurrentWeekId()
+	local entries = getCachedEntries(currentWeekId)
 
 	local myRecord = playerBaselines[player]
 	local myWeeklyEssence = 0
