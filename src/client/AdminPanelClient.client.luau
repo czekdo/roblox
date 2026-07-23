@@ -50,6 +50,7 @@ local TabIcons = {
 	Dragons = Theme.Icons.Dragon,
 	World = Theme.Icons.House,
 	Buildings = Theme.Icons.Hammer,
+	Events = Theme.Icons.Star,
 	Progress = Theme.Icons.Scroll,
 	Save = Theme.Icons.Backpack,
 	Debug = Theme.Icons.Settings,
@@ -590,6 +591,59 @@ local buildingDropdown = createDropdown(buildingRow, adminData.buildings or {}, 
 local buildingLevelInput = createInput(buildingRow, "Level", 80, 2, tostring(adminData.maxBuildingLevel or 5))
 createButton({ Parent = buildingRow, Size = UDim2.fromOffset(110, 40), Bg = Colors.Gold, Text = "Set Level", LayoutOrder = 3, OnClick = function() sendAction("SetBuildingLevel", { buildingId = buildingDropdown:GetValue(), level = tonumber(buildingLevelInput.Text) or 1 }) end })
 createButton({ Parent = buildingRow, Size = UDim2.fromOffset(110, 40), Bg = Colors.Success, Text = "Max Level", LayoutOrder = 4, OnClick = function() sendAction("SetBuildingMaxLevel", { buildingId = buildingDropdown:GetValue() }) end })
+
+local eventsPage = tabPages.Events.scroll
+local eventsSection = createSection(eventsPage, "Global Events", 1)
+
+local eventsStatusRow = createRow(eventsSection, 2, 28)
+local eventsStatus = createText({
+	Name = "EventsStatus", Parent = eventsStatusRow, Text = "No event active",
+	Size = UDim2.new(1, 0, 1, 0), TextSize = 14, Color = Colors.TextMuted,
+	XAlign = Enum.TextXAlignment.Left, ZIndex = 11,
+})
+
+local eventsRow = createRow(eventsSection, 3, 44)
+registerSearchRow(eventsRow, "event luck essence boost start end global promotion")
+local eventTypeDropdown = createDropdown(eventsRow, adminData.eventTypes or {}, 160, 1)
+local eventMultiplierInput = createInput(eventsRow, "Multiplier (e.g. 2)", 150, 2, "2")
+local eventDurationInput = createInput(eventsRow, "Hours (e.g. 24)", 140, 3, "24")
+
+local eventsActionRow = createRow(eventsSection, 4, 44)
+createButton({
+	Parent = eventsActionRow, Size = UDim2.fromOffset(150, 40), Bg = Colors.Success, Text = "Start Event", LayoutOrder = 1,
+	OnClick = function()
+		sendAction("StartGlobalEvent", {
+			eventType = eventTypeDropdown:GetValue(),
+			multiplier = tonumber(eventMultiplierInput.Text) or 2,
+			durationHours = tonumber(eventDurationInput.Text) or 24,
+		})
+	end,
+})
+createButton({
+	Parent = eventsActionRow, Size = UDim2.fromOffset(150, 40), Bg = Colors.Danger, Text = "End Event Now", LayoutOrder = 2,
+	OnClick = function() sendAction("EndGlobalEvent") end,
+})
+
+local function formatEventStatus(event)
+	if typeof(event) ~= "table" then
+		return "No event active"
+	end
+	local remaining = math.max(0, math.floor((event.endsAt or 0) - os.time()))
+	local hours = math.floor(remaining / 3600)
+	local minutes = math.floor((remaining % 3600) / 60)
+	return string.format("%s active - x%.2f - %dh %dm left", tostring(event.label or event.type), tonumber(event.multiplier) or 1, hours, minutes)
+end
+
+eventsStatus.Text = formatEventStatus(adminData.activeEvent)
+
+task.spawn(function()
+	while eventsStatus.Parent do
+		if adminData.activeEvent then
+			eventsStatus.Text = formatEventStatus(adminData.activeEvent)
+		end
+		task.wait(30)
+	end
+end)
 
 local progressPage = tabPages.Progress.scroll
 local progressSection = createSection(progressPage, "Progress Tools", 1)

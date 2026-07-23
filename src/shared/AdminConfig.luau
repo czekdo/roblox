@@ -13,7 +13,7 @@ local AdminConfig = {
 		{ Id = "RubyCrystal", DisplayName = "Ruby Crystal", Icon = "rbxassetid://127726919558379" },
 		{ Id = "SapphireCrystal", DisplayName = "Sapphire Crystal", Icon = "rbxassetid://78918235954057" },
 	},
-	TabOrder = { "Player", "Resources", "Eggs", "Dragons", "World", "Buildings", "Progress", "Save", "Debug" },
+	TabOrder = { "Player", "Resources", "Eggs", "Dragons", "World", "Buildings", "Events", "Progress", "Save", "Debug" },
 }
 
 local allowedIds = {}

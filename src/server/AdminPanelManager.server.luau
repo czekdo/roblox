@@ -8,6 +8,7 @@ local IslandUnlockConfig = require(ReplicatedStorage:WaitForChild("IslandUnlockC
 local DragonEggConfig = require(ReplicatedStorage:WaitForChild("DragonEggConfig"))
 local BuildingConfig = require(ReplicatedStorage:WaitForChild("BuildingConfig"))
 local WorkspaceLayout = require(ReplicatedStorage:WaitForChild("WorkspaceLayout"))
+local GlobalEventConfig = require(ReplicatedStorage:WaitForChild("GlobalEventConfig"))
 
 local AdminEvents = ReplicatedStorage:WaitForChild("AdminEvents")
 local AdminCommand = AdminEvents:WaitForChild("AdminCommand")
@@ -313,6 +314,24 @@ local handlers = {
 		end
 		return false, result
 	end,
+	StartGlobalEvent = function(player, payload)
+		local eventType = tostring(payload and payload.eventType or "")
+		local multiplier = payload and payload.multiplier
+		local durationHours = payload and payload.durationHours
+		local label = payload and payload.label
+		local ok, result = AdminBridge.call("GlobalEvent", "start", player, eventType, multiplier, durationHours, label)
+		if ok then
+			return true, result
+		end
+		return false, result
+	end,
+	EndGlobalEvent = function(player)
+		local ok, result = AdminBridge.call("GlobalEvent", "stop", player)
+		if ok then
+			return true, result
+		end
+		return false, result
+	end,
 }
 
 CheckAdminAccess.OnServerInvoke = function(player)
@@ -346,6 +365,12 @@ CheckAdminAccess.OnServerInvoke = function(player)
 		end
 	end
 
+	local eventTypes = {}
+	for typeId, info in GlobalEventConfig.Types do
+		table.insert(eventTypes, { id = typeId, name = info.Label })
+	end
+	local _, activeEvent = AdminBridge.call("GlobalEvent", "getState")
+
 	return {
 		isAdmin = true,
 		resources = AdminConfig.ResourceTypes,
@@ -356,6 +381,10 @@ CheckAdminAccess.OnServerInvoke = function(player)
 		buildings = buildings,
 		maxBuildingLevel = BuildingConfig.Upgrade.MaxLevel or 25,
 		tabs = AdminConfig.TabOrder,
+		eventTypes = eventTypes,
+		multiplierPresets = GlobalEventConfig.MultiplierPresets,
+		durationPresetsHours = GlobalEventConfig.DurationPresetsHours,
+		activeEvent = activeEvent,
 	}
 end
 

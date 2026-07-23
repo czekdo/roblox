@@ -4,6 +4,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local RebirthConfig = require(ReplicatedStorage:WaitForChild("RebirthConfig"))
 local RebirthState = require(ServerScriptService:WaitForChild("RebirthState"))
 local DragonEggConfig = require(ReplicatedStorage:WaitForChild("DragonEggConfig"))
+local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 
 local AscensionBonusService = {}
 
@@ -200,7 +201,12 @@ function AscensionBonusService.ApplyAbilityProcChance(player, baseChance)
 end
 
 function AscensionBonusService.RollHatchRarity(player)
-	local luckBonus = AscensionBonusService.GetBonus(player, "HatchLuckBonus")
+	-- Global "Luck Boost" events (admin-triggered, see GlobalEventManager) stack additively with a
+	-- player's own Ascension luck bonus - a x1.5 event multiplier becomes +0.5 here, same units as
+	-- HatchLuckBonus (0.14 = +14%).
+	local ok, globalLuckMultiplier = AdminBridge.call("GlobalEvent", "getMultiplier", "LuckBoost")
+	local globalLuckBonus = (ok and tonumber(globalLuckMultiplier) or 1) - 1
+	local luckBonus = AscensionBonusService.GetBonus(player, "HatchLuckBonus") + globalLuckBonus
 	if luckBonus <= 0 then
 		return DragonEggConfig.RollRarity()
 	end

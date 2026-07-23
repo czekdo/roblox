@@ -20,6 +20,7 @@ local DragonAIController = require(ServerScriptService:WaitForChild("DragonAICon
 local DragonAbilityService = require(ServerScriptService:WaitForChild("DragonAbilityService"))
 local RateLimiter = require(ServerScriptService:WaitForChild("RateLimiter"))
 local AscensionBonusService = require(ServerScriptService:WaitForChild("AscensionBonusService"))
+local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 local Events = ReplicatedStorage:WaitForChild("HarvestEvents")
 local TargetNode = Events:WaitForChild("TargetNode")
 local BuyDragonEgg = Events:WaitForChild("BuyDragonEgg")
@@ -1831,9 +1832,11 @@ local function performHarvestHit(player, dragon, node)
 	local baseAmount = stats.CarryCapacity
 	local isCritical = math.random() < stats.CriticalHarvestChance
 	local harvestAmount = isCritical and math.floor(baseAmount * stats.CriticalMultiplier + 0.5) or baseAmount
+	local ok, globalEssenceMultiplier = AdminBridge.call("GlobalEvent", "getMultiplier", "EssenceBoost")
 	local essenceBoost = getActiveBoostMultiplier(player, "QuestEssenceBoost")
 		* getActiveBoostMultiplier(player, "CraftEssenceBoost")
 		* getActiveBoostMultiplier(player, "TutorialEssenceBoost")
+		* ((ok and tonumber(globalEssenceMultiplier)) or 1)
 	local harvestBonus = 1 + AscensionBonusService.GetBonus(player, "HarvestMultiplier")
 	local islandId = node:GetAttribute("IslandId")
 	local islandMultiplier = islandId and IslandUnlockConfig.GetEssenceMultiplier(islandId) or 1
@@ -2631,8 +2634,6 @@ RebirthDomainBridge.Register("Dragon", {
 		return { success = true }
 	end,
 })
-
-local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 
 local function getAdminSpawnPosition(player)
 	local data = getPlayerData(player)
