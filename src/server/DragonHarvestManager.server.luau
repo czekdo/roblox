@@ -2738,41 +2738,49 @@ AdminBridge.register("Harvest", {
 		spawnResourceNodes(player)
 		return "Crystal nodes refreshed"
 	end,
+	-- Searches the FULL owned inventory (data.ownedDragonById - equipped and storage alike), not
+	-- just data.dragons (only the currently-spawned/equipped runtime instances). A player can own
+	-- hundreds of dragons sitting in storage with just a handful equipped at once, so matching only
+	-- against data.dragons would silently miss almost everything they own.
 	removeDragon = function(player, payload)
 		payload = typeof(payload) == "table" and payload or {}
 		local data = getPlayerData(player)
 		local targetType = payload.dragonType
 		local targetRarity = payload.rarity
-		for index = #data.dragons, 1, -1 do
-			local dragon = data.dragons[index]
+		for id, record in data.ownedDragonById do
 			local typeMatch = not targetType
-				or dragon.dragonType == targetType
-				or DragonEggConfig.GetDragonModelName(targetType) == dragon.dragonType
-			local rarityMatch = not targetRarity or dragon.rarity == targetRarity
+				or record.dragonType == targetType
+				or DragonEggConfig.GetDragonModelName(targetType) == record.dragonType
+			local rarityMatch = not targetRarity or record.rarity == targetRarity
 			if typeMatch and rarityMatch then
-				if dragon.model and dragon.model.Parent then
-					dragon.model:Destroy()
+				if record.isEquipped then
+					despawnRuntimeDragon(data, DragonInventoryService.GetRuntimeDragon(data, id))
 				end
-				table.remove(data.dragons, index)
+				local removedType = record.dragonType
+				data.ownedDragonById[id] = nil
+				DragonInventoryService.RebuildCount(data)
 				saveDragonLevels(player)
 				sendUIUpdate(player)
-				return "Removed " .. (dragon.dragonType or "dragon")
+				sendDragonMergeUpdate(player)
+				return "Removed " .. (removedType or "dragon")
 			end
 		end
 		return "No matching dragon found"
 	end,
 	removeAllDragons = function(player)
 		local data = getPlayerData(player)
-		local removed = #data.dragons
-		for index = #data.dragons, 1, -1 do
-			local dragon = data.dragons[index]
+		local removed = DragonInventoryService.GetOwnedCount(data)
+		for _, dragon in data.dragons do
 			if dragon.model and dragon.model.Parent then
 				dragon.model:Destroy()
 			end
-			table.remove(data.dragons, index)
 		end
+		data.dragons = {}
+		data.ownedDragonById = {}
+		data.ownedDragonCount = 0
 		saveDragonLevels(player)
 		sendUIUpdate(player)
+		sendDragonMergeUpdate(player)
 		return "Removed " .. removed .. " dragon(s)"
 	end,
 	refreshUI = function(player)
@@ -2803,11 +2811,19 @@ AdminBridge.register("Harvest", {
 		data.nodes = {}
 		data.savedDragons = {}
 		data.nextSavedDragonIndex = 1
+		-- data.savedDragons/nextSavedDragonIndex above is the legacy pre-DragonInventoryService
+		-- storage field - ownedDragonById is the one actually read/written today (equipped AND
+		-- storage dragons alike). Missing this meant a wipe could leave the full owned inventory
+		-- untouched in the live session, and a later autosave could even resurrect it into the
+		-- freshly-wiped DataStore before the player rejoins.
+		data.ownedDragonById = {}
+		data.ownedDragonCount = 0
 		data.eggStats = sanitizeEggStats(nil)
 		data.mergeStats = sanitizeMergeStats(nil)
 		DragonAbilityService.Clear(player)
 		data.essence = 0
 		sendUIUpdate(player)
+		sendDragonMergeUpdate(player)
 		return "Harvest runtime wiped"
 	end,
 })
