@@ -396,7 +396,10 @@ local function ensureExtrasGui()
 			closeExtrasPanel()
 		end
 	end)
-	extrasPanel = Theme.createPanel({ Name = "ExtrasPanel", Parent = extrasGui, Size = UDim2.fromOffset(440, 360), Visible = false, ZIndex = 25 })
+	-- Tall enough for the Settings panel's worst case (2 sliders + 2 action buttons, e.g. Music/SFX
+	-- volume plus Invite Friends/Restart Tutorial) without the button stack spilling past the
+	-- panel's bottom border - the previous 360 fit only a single action button.
+	extrasPanel = Theme.createPanel({ Name = "ExtrasPanel", Parent = extrasGui, Size = UDim2.fromOffset(440, 460), Visible = false, ZIndex = 25 })
 	extrasPanel:SetAttribute("OpenPosition", extrasPanel.Position)
 	Theme.createCloseButton(extrasPanel, function()
 		closeExtrasPanel()
@@ -504,6 +507,16 @@ _G.DragonIslandOpenSettings = function()
 		"Settings",
 		"Gameplay helpers and preferences. Lost the tutorial guide? Use the \"Resume Tutorial\" chip in the corner of the screen instead of restarting.",
 		{
+			{
+				Name = "InviteFriendsButton",
+				Text = "Invite Friends",
+				Bg = Theme.Colors.Success,
+				OnClick = function()
+					if _G.DragonIslandOpenReferral then
+						_G.DragonIslandOpenReferral()
+					end
+				end,
+			},
 			{
 				Name = "ReplayTutorialButton",
 				Text = "Restart Tutorial from Step 1",

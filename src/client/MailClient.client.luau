@@ -27,20 +27,25 @@ local function createMailCard(entry)
 	Theme.stroke(card, entry.Claimed and Theme.Colors.TextMuted or Theme.Colors.Gold, 1, entry.Claimed and 0.7 or 0.3)
 	Theme.padding(card, 10, 10, 12, 12)
 
+	-- entry.Reward is a single reward table (the original shape); entry.Rewards is a list (added
+	-- for payouts that grant more than one currency at once, e.g. weekly leaderboard/comeback
+	-- bonuses paying Gems + Essence together). Either one should show the same Claim/Claimed UI.
+	local hasReward = entry.Reward ~= nil or entry.Rewards ~= nil
+
 	Theme.createText({
 		Name = "Title", Parent = card, Text = entry.Title,
-		Size = UDim2.new(1, entry.Reward and -110 or -20, 0, 20), Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(1, hasReward and -110 or -20, 0, 20), Position = UDim2.fromOffset(0, 0),
 		TextSize = 15, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextLight,
 		XAlign = Enum.TextXAlignment.Left, ZIndex = 9,
 	})
 	Theme.createText({
 		Name = "Body", Parent = card, Text = entry.Body or "",
-		Size = UDim2.new(1, entry.Reward and -110 or -20, 0, 44), Position = UDim2.fromOffset(0, 22),
+		Size = UDim2.new(1, hasReward and -110 or -20, 0, 44), Position = UDim2.fromOffset(0, 22),
 		TextSize = 12, Font = Theme.Fonts.Body, Color = Theme.Colors.TextMuted,
 		Wrapped = true, YAlign = Enum.TextYAlignment.Top, XAlign = Enum.TextXAlignment.Left, ZIndex = 9,
 	})
 
-	if entry.Reward then
+	if hasReward then
 		if entry.Claimed then
 			Theme.createText({
 				Name = "Claimed", Parent = card, Text = "Claimed",
