@@ -466,6 +466,15 @@ Players.PlayerRemoving:Connect(function(player)
 	saveQueued[player] = nil
 end)
 
+-- Safety net for shutdown scenarios where PlayerRemoving isn't guaranteed to fire for every
+-- connected player (Roblox's own recommendation) - this data includes kingdom level/lifetime
+-- essence, too important to risk on a server restart.
+game:BindToClose(function()
+	for player in pairs(playerKingdomData) do
+		saveNow(player)
+	end
+end)
+
 AdminBridge.register("Kingdom", {
 	refreshState = function(player)
 		sendState(player)

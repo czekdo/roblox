@@ -704,6 +704,14 @@ Players.PlayerRemoving:Connect(function(player)
 	teleportCooldown[player] = nil
 end)
 
+-- Safety net for shutdown scenarios where PlayerRemoving isn't guaranteed to fire for every
+-- connected player - island unlocks are expensive essence purchases, worth protecting.
+game:BindToClose(function()
+	for player in pairs(playerUnlockData) do
+		saveNow(player)
+	end
+end)
+
 local function adminUnlockIsland(player, islandId)
 	local island = IslandUnlockConfig.GetIslandById(islandId)
 	if not island then

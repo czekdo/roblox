@@ -255,6 +255,14 @@ Players.PlayerRemoving:Connect(function(player)
 	rebirthLocks[player] = nil
 end)
 
+-- Safety net for shutdown scenarios where PlayerRemoving isn't guaranteed to fire for every
+-- connected player - rebirth/ascension progress is major, hard-earned player progression.
+game:BindToClose(function()
+	for _, player in Players:GetPlayers() do
+		saveNow(player)
+	end
+end)
+
 local AdminBridge = require(ServerScriptService:WaitForChild("AdminBridge"))
 
 AdminBridge.register("Rebirth", {

@@ -427,6 +427,15 @@ Players.PlayerRemoving:Connect(function(player)
 	saveQueued[player] = nil
 end)
 
+-- Safety net for shutdown scenarios where PlayerRemoving isn't guaranteed to fire for every
+-- connected player - an in-progress training session (and the essence spent starting it)
+-- shouldn't be able to vanish on a server restart.
+game:BindToClose(function()
+	for player in pairs(playerSessions) do
+		saveNow(player)
+	end
+end)
+
 task.spawn(function()
 	while true do
 		task.wait(5)

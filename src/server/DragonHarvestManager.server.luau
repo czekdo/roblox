@@ -428,6 +428,14 @@ local function loadDragonLevels(player)
 		DragonInventoryService.LoadOwnedDragons(data, result.ownedDragons, result.nextOwnedDragonId)
 		data.mergeStats = sanitizeMergeStats(result.mergeStats)
 		DragonAbilityService.Load(player, result.dragonAbilities)
+		-- Essence had no persistence at all until this fix: it only ever lived in a runtime
+		-- attribute defaulted from nothing on join, so it silently reset to 0 on every server
+		-- restart (including routine Roblox maintenance restarts), regardless of how much a
+		-- player had earned. Saved/loaded here alongside the rest of this same record.
+		if result.essence ~= nil then
+			data.essence = math.max(0, math.floor(tonumber(result.essence) or 0))
+			player:SetAttribute("DragonEssence", data.essence)
+		end
 	elseif not success then
 		warn("[DragonHarvestManager] Failed to load dragon levels for", player.UserId, result)
 		data.mergeStats = sanitizeMergeStats(data.mergeStats)
@@ -450,6 +458,7 @@ local function saveDragonLevels(player)
 	local ownedDragons, nextOwnedDragonId = DragonInventoryService.SerializeOwnedDragons(data)
 	local mergeStats = sanitizeMergeStats(data.mergeStats)
 	local key = tostring(player.UserId)
+	local essence = math.max(0, math.floor(tonumber(data.essence) or 0))
 	local success, err = pcall(function()
 		dragonLevelStore:UpdateAsync(key, function()
 			return {
@@ -458,6 +467,7 @@ local function saveDragonLevels(player)
 				nextOwnedDragonId = nextOwnedDragonId,
 				mergeStats = mergeStats,
 				dragonAbilities = DragonAbilityService.Serialize(player),
+				essence = essence,
 				updatedAt = os.time(),
 			}
 		end)
@@ -2327,6 +2337,8 @@ nodesFolder.ChildAdded:Connect(function()
 	end
 end)
 
+local ESSENCE_AUTOSAVE_INTERVAL = 30
+
 RunService.Heartbeat:Connect(function(dt)
 	for player, data in pairs(playerData) do
 		if player.Parent then
@@ -2340,6 +2352,16 @@ RunService.Heartbeat:Connect(function(dt)
 
 			for _, dragon in data.dragons do
 				updateDragon(player, dragon, dt)
+			end
+
+			-- Every other saveDragonLevels() call site is tied to a specific action (upgrade,
+			-- merge, equip, etc.) - a player who's just harvesting essence without doing any of
+			-- those could otherwise go a whole session without their essence ever reaching the
+			-- DataStore. This periodic flush closes that gap.
+			data.essenceSaveTimer = (data.essenceSaveTimer or 0) + dt
+			if data.essenceSaveTimer >= ESSENCE_AUTOSAVE_INTERVAL then
+				data.essenceSaveTimer = 0
+				saveDragonLevels(player)
 			end
 		end
 	end
@@ -2380,6 +2402,17 @@ Players.PlayerRemoving:Connect(function(player)
 
 	playerData[player] = nil
 	DragonAbilityService.Release(player)
+end)
+
+-- Roblox doesn't guarantee PlayerRemoving fires for every connected player in every shutdown
+-- scenario (server restarts for deployments, crashes, etc.) - BindToClose is the officially
+-- recommended safety net for exactly this, and this file holds the single most important player
+-- data in the game (essence, owned dragons, egg progress), so it needs one.
+game:BindToClose(function()
+	for player in pairs(playerData) do
+		saveDragonLevels(player)
+		saveEggProgress(player)
+	end
 end)
 
 DragonRosterBridge.register({

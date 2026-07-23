@@ -456,6 +456,15 @@ Players.PlayerRemoving:Connect(function(player)
 	saveQueued[player] = nil
 end)
 
+-- Safety net for shutdown scenarios where PlayerRemoving isn't guaranteed to fire for every
+-- connected player - buildings already autosave periodically, but this covers the gap between
+-- the last periodic save and a shutdown.
+game:BindToClose(function()
+	for player in pairs(playerBuildingData) do
+		saveNow(player)
+	end
+end)
+
 task.spawn(function()
 	while true do
 		task.wait(BuildingConfig.SaveInterval)

@@ -182,4 +182,24 @@ AdminBridge.register("Monetization", {
 	end,
 })
 
-print("[MonetizationService] Monetization scaffolding ready (placeholder IDs - fill in real GamePass/DeveloperProduct IDs in MonetizationConfig.luau)")
+-- Checked dynamically (not just printed once and forgotten) so this warns again if a future
+-- GamePass/DeveloperProduct ever gets added with its Id left at the 0 placeholder.
+local function hasPlaceholderIds()
+	for _, pass in MonetizationConfig.GamePasses do
+		if not pass.Id or pass.Id == 0 then
+			return true
+		end
+	end
+	for _, product in MonetizationConfig.DeveloperProducts do
+		if not product.Id or product.Id == 0 then
+			return true
+		end
+	end
+	return false
+end
+
+if hasPlaceholderIds() then
+	warn("[MonetizationService] Some GamePass/DeveloperProduct IDs are still placeholders (0) - fill them in in MonetizationConfig.luau before publishing.")
+else
+	print("[MonetizationService] Monetization ready")
+end

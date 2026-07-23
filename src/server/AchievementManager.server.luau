@@ -643,6 +643,14 @@ Players.PlayerRemoving:Connect(function(player)
 	sessionJoinAt[player] = nil
 end)
 
+-- Safety net for shutdown scenarios where PlayerRemoving isn't guaranteed to fire for every
+-- connected player - achievement progress/claims shouldn't be able to silently roll back.
+game:BindToClose(function()
+	for player in pairs(playerData) do
+		saveNow(player)
+	end
+end)
+
 task.spawn(function()
 	while true do
 		task.wait(AchievementConfig.PlayTimeTick)
