@@ -509,6 +509,25 @@ local removeEssenceInput = createInput(essenceUtilityRow, "Amount", 100, 1, "100
 createButton({ Parent = essenceUtilityRow, Size = UDim2.fromOffset(130, 40), Bg = Colors.Danger, Text = "Remove Essence", LayoutOrder = 2, OnClick = function() sendAction("RemoveEssence", { amount = tonumber(removeEssenceInput.Text) or 1000 }) end })
 createButton({ Parent = essenceUtilityRow, Size = UDim2.fromOffset(130, 40), Bg = Colors.Info, Text = "Refresh Player", LayoutOrder = 3, OnClick = function() sendAction("ReloadPlayer") end })
 
+local moderationSection = createSection(playerPage, "Moderation", 2)
+local moderationRow = createRow(moderationSection, 2, 44)
+registerSearchRow(moderationRow, "kick ban unban moderate player username userid")
+local moderationTargetInput = createInput(moderationRow, "Username or UserId", 190, 1, "")
+local moderationReasonInput = createInput(moderationRow, "Reason (optional)", 190, 2, "")
+local moderationActionRow = createRow(moderationSection, 3, 44)
+createButton({
+	Parent = moderationActionRow, Size = UDim2.fromOffset(110, 40), Bg = Colors.Info, Text = "Kick", LayoutOrder = 1,
+	OnClick = function() sendAction("KickPlayer", { target = moderationTargetInput.Text, reason = moderationReasonInput.Text }) end,
+})
+createButton({
+	Parent = moderationActionRow, Size = UDim2.fromOffset(110, 40), Bg = Colors.Danger, Text = "Ban", LayoutOrder = 2,
+	OnClick = function() sendAction("BanPlayer", { target = moderationTargetInput.Text, reason = moderationReasonInput.Text }) end,
+})
+createButton({
+	Parent = moderationActionRow, Size = UDim2.fromOffset(110, 40), Bg = Colors.Success, Text = "Unban", LayoutOrder = 3,
+	OnClick = function() sendAction("UnbanPlayer", { target = moderationTargetInput.Text }) end,
+})
+
 local resourcesPage = tabPages.Resources.scroll
 local resourcesSection = createSection(resourcesPage, "Spawn Resources", 1)
 for resourceIndex, resource in adminData.resources or AdminConfig.ResourceTypes do

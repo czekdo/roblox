@@ -101,17 +101,19 @@ local function getState()
 	return activeEvent
 end
 
--- Registered functions here return a single message string (never a (bool, message) tuple) - the
--- same convention every other AdminBridge-registered domain in this codebase uses, since
--- AdminBridge.call's own "return true, method(...)" already expands a multi-value method result
--- into extra positional returns, silently breaking a caller that only captures 2 values.
+-- Registered functions here return a single table value { success, message } (never multiple
+-- return values) - the same convention every other AdminBridge-registered domain in this codebase
+-- uses, since AdminBridge.call's own "return true, method(...)" already expands a multi-value
+-- method result into extra positional returns, silently breaking a caller that only captures 2
+-- values. Packing success+message into one table keeps it a single value while still letting
+-- callers tell a blocked/failed action apart from one that actually happened.
 local function startEvent(player, eventType, multiplier, durationHours, label)
 	if not AdminConfig.IsAdmin(player) then
-		return "Not authorized"
+		return { success = false, message = "Not authorized" }
 	end
 	local typeInfo = GlobalEventConfig.Types[eventType]
 	if not typeInfo then
-		return "Unknown event type"
+		return { success = false, message = "Unknown event type" }
 	end
 	local numMultiplier = math.clamp(tonumber(multiplier) or 1, 1, 20)
 	local numHours = math.clamp(tonumber(durationHours) or 1, 0.1, 24 * 30)
@@ -133,12 +135,12 @@ local function startEvent(player, eventType, multiplier, durationHours, label)
 	end
 
 	broadcastState()
-	return string.format("%s started: x%.2f for %.1fh", typeInfo.Label, numMultiplier, numHours)
+	return { success = true, message = string.format("%s started: x%.2f for %.1fh", typeInfo.Label, numMultiplier, numHours) }
 end
 
 local function endEvent(player)
 	if not AdminConfig.IsAdmin(player) then
-		return "Not authorized"
+		return { success = false, message = "Not authorized" }
 	end
 	activeEvent = nil
 	if dataStoreAvailable then
@@ -147,7 +149,7 @@ local function endEvent(player)
 		end)
 	end
 	broadcastState()
-	return "Event ended"
+	return { success = true, message = "Event ended" }
 end
 
 -- getMultiplier is registered here too (not just start/stop/getState) so DragonHarvestManager and

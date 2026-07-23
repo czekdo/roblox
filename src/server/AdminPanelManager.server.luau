@@ -20,14 +20,30 @@ local IslandUnlockState = ReplicatedStorage:WaitForChild("IslandEvents"):WaitFor
 local IslandTeleportRequest = ReplicatedStorage:WaitForChild("IslandEvents"):WaitForChild("IslandTeleportRequest")
 local PortalTravel = ReplicatedStorage:WaitForChild("IslandEvents"):WaitForChild("PortalTravel")
 
+-- Every per-player DataStore that represents progress, so "Wipe Save" actually resets everything
+-- rather than leaving some systems stuck showing old data. Deliberately excludes: player
+-- preferences (DragonIslandSettingsV1 - not "progress"), anything Monetization-related (real
+-- purchase receipt/idempotency tracking - wiping that risks a re-processed receipt double-granting
+-- a real purchase), and global (not per-player) stores like the weekly board state or global events.
 local DATASTORES = {
 	"IslandUnlocksV1",
 	"KingdomProgressV1",
 	"DragonWorkerLevelsV1",
 	"DragonEggProgressV1",
 	"DailyQuestProgressV1",
-	"DragonIslandTutorialV1",
+	"DragonIslandTutorialV2", -- was "DragonIslandTutorialV1" - that's the legacy store TutorialService migrates FROM, not the current one, so wiping it never actually touched a fresh save's real tutorial progress
 	"FixedBuildingProgressV1",
+	"AchievementProgressV1",
+	"DragonIslandLastSeenV1",
+	"DragonIslandDailyRewardV1",
+	"DragonIslandDailyWheelV1",
+	"DragonIslandInventoryV1",
+	"DragonTrainingSessionsV1",
+	"DragonIslandReferralLinkV1",
+	"DragonIslandReferralCountV1",
+	"RebirthProgressV1",
+	"DragonIslandMailV1",
+	"DragonIslandRewardPassClaimsV1",
 }
 
 local TELEPORT_COOLDOWN = 0.5
@@ -154,6 +170,7 @@ local function wipePlayer(player)
 		AdminBridge.call(domain, "wipe", player)
 	end
 	player:SetAttribute("DragonEssence", 0)
+	player:SetAttribute("PremiumGems", 0)
 	player:SetAttribute("TutorialCompleted", false)
 	player:SetAttribute("TutorialStep", 1)
 	player:SetAttribute("KingdomLevel", 1)
@@ -314,23 +331,63 @@ local handlers = {
 		end
 		return false, result
 	end,
+	-- GlobalEvent/Moderation domains return a single { success, message } table (not a bare
+	-- string) precisely so this wrapper can tell "the call executed" (AdminBridge.call's own ok)
+	-- apart from "the action actually happened" (result.success) - a blocked/failed action (e.g.
+	-- "Can't kick another admin") still needs to reach the client as an error-styled toast, not a
+	-- false positive success just because the call itself didn't error.
 	StartGlobalEvent = function(player, payload)
 		local eventType = tostring(payload and payload.eventType or "")
 		local multiplier = payload and payload.multiplier
 		local durationHours = payload and payload.durationHours
 		local label = payload and payload.label
 		local ok, result = AdminBridge.call("GlobalEvent", "start", player, eventType, multiplier, durationHours, label)
-		if ok then
-			return true, result
+		if ok and typeof(result) == "table" then
+			return result.success == true, result.message
 		end
-		return false, result
+		return false, "Failed to start event"
 	end,
 	EndGlobalEvent = function(player)
 		local ok, result = AdminBridge.call("GlobalEvent", "stop", player)
-		if ok then
-			return true, result
+		if ok and typeof(result) == "table" then
+			return result.success == true, result.message
 		end
-		return false, result
+		return false, "Failed to end event"
+	end,
+	KickPlayer = function(player, payload)
+		local target = tostring(payload and payload.target or "")
+		local reason = tostring(payload and payload.reason or "")
+		if target == "" then
+			return false, "Missing player"
+		end
+		local ok, result = AdminBridge.call("Moderation", "kick", player, target, reason)
+		if ok and typeof(result) == "table" then
+			return result.success == true, result.message
+		end
+		return false, "Failed to kick player"
+	end,
+	BanPlayer = function(player, payload)
+		local target = tostring(payload and payload.target or "")
+		local reason = tostring(payload and payload.reason or "")
+		if target == "" then
+			return false, "Missing player"
+		end
+		local ok, result = AdminBridge.call("Moderation", "ban", player, target, reason)
+		if ok and typeof(result) == "table" then
+			return result.success == true, result.message
+		end
+		return false, "Failed to ban player"
+	end,
+	UnbanPlayer = function(player, payload)
+		local target = tostring(payload and payload.target or "")
+		if target == "" then
+			return false, "Missing player"
+		end
+		local ok, result = AdminBridge.call("Moderation", "unban", player, target)
+		if ok and typeof(result) == "table" then
+			return result.success == true, result.message
+		end
+		return false, "Failed to unban player"
 	end,
 }
 
