@@ -24,9 +24,9 @@ DragonEggConfig.EggTypes = {
 		GlowColor = Color3.fromRGB(255, 240, 180),
 		Icon = DragonEggConfig.IconAssetId,
 		Dragons = {
-			{ Name = "BabyGreenDragon", DisplayName = "Baby Green Dragon", ModelName = "ForestDragon", Weight = 1 },
-			{ Name = "BabyRedDragon", DisplayName = "Baby Red Dragon", ModelName = "FireDragon", Weight = 1 },
-			{ Name = "BabyBlueDragon", DisplayName = "Baby Blue Dragon", ModelName = "IceDragon", Weight = 1 },
+			{ Name = "ForestDragon", DisplayName = "Forest Dragon", ModelName = "ForestDragon", Weight = 1 },
+			{ Name = "FireDragon", DisplayName = "Fire Dragon", ModelName = "FireDragon", Weight = 1 },
+			{ Name = "IceDragon", DisplayName = "Ice Dragon", ModelName = "IceDragon", Weight = 1 },
 		},
 	},
 	Rare = {
@@ -42,9 +42,9 @@ DragonEggConfig.EggTypes = {
 		GuaranteedRarity = "Rare",
 		RewardOnly = true,
 		Dragons = {
-			{ Name = "BabyGreenDragon", DisplayName = "Baby Green Dragon", ModelName = "ForestDragon", Weight = 1 },
-			{ Name = "BabyRedDragon", DisplayName = "Baby Red Dragon", ModelName = "FireDragon", Weight = 1 },
-			{ Name = "BabyBlueDragon", DisplayName = "Baby Blue Dragon", ModelName = "IceDragon", Weight = 1 },
+			{ Name = "ForestDragon", DisplayName = "Forest Dragon", ModelName = "ForestDragon", Weight = 1 },
+			{ Name = "FireDragon", DisplayName = "Fire Dragon", ModelName = "FireDragon", Weight = 1 },
+			{ Name = "IceDragon", DisplayName = "Ice Dragon", ModelName = "IceDragon", Weight = 1 },
 		},
 	},
 	Forest = {
@@ -201,9 +201,9 @@ DragonEggConfig.EggTypes = {
 		Icon = "rbxassetid://78843852703854",
 		IsFeatured = true,
 		Dragons = {
-			{ Name = "BabyGreenDragon", DisplayName = "Baby Green Dragon", ModelName = "ForestDragon", Weight = 1 },
-			{ Name = "BabyRedDragon", DisplayName = "Baby Red Dragon", ModelName = "FireDragon", Weight = 1 },
-			{ Name = "BabyBlueDragon", DisplayName = "Baby Blue Dragon", ModelName = "IceDragon", Weight = 1 },
+			{ Name = "ForestDragon", DisplayName = "Forest Dragon", ModelName = "ForestDragon", Weight = 1 },
+			{ Name = "FireDragon", DisplayName = "Fire Dragon", ModelName = "FireDragon", Weight = 1 },
+			{ Name = "IceDragon", DisplayName = "Ice Dragon", ModelName = "IceDragon", Weight = 1 },
 		},
 	},
 	Ancient = {
