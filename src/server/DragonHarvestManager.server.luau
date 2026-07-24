@@ -1635,6 +1635,7 @@ local function createEgg(player, position, eggType, options)
 		model = eggModel,
 		position = position,
 		eggType = eggType,
+		autoHatch = options.autoHatch == true,
 	}
 	table.insert(data.eggs, eggRecord)
 	saveEggProgress(player)
@@ -1646,7 +1647,14 @@ local function createEgg(player, position, eggType, options)
 			removeEggRecord(data, eggRecord)
 			return
 		end
-		beginHatchSequence(player, eggRecord)
+		if eggRecord.autoHatch then
+			-- Auto-Hatch Pass: skip the full-screen reveal cinematic (EggHatchStart) entirely and
+			-- go straight to inventory - the whole point of the pass is hands-off hatching, and
+			-- forcing a "Click or press Space to skip" screen every ~6 seconds would defeat that.
+			finalizeHatch(player, eggRecord, rollHatchResults(player, eggRecord))
+		else
+			beginHatchSequence(player, eggRecord)
+		end
 	end)
 end
 
@@ -2344,7 +2352,7 @@ tryStartAutoHatch = function(player)
 	if not position then
 		return
 	end
-	createEgg(player, position, state.eggType)
+	createEgg(player, position, state.eggType, { autoHatch = true })
 end
 
 SetAutoHatch.OnServerEvent:Connect(function(player, eggType, enabled)

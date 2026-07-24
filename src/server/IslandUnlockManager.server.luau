@@ -229,15 +229,40 @@ local function getModelPromptPart(model)
 	return largestPart
 end
 
+-- Same fix as HubPortalManager's getPortalPromptPart: compute a sensible interaction height from
+-- the model's own bounding box rather than trusting a manually-placed InteractionAnchor or
+-- whatever PrimaryPart/largest-part getModelPromptPart would fall back to - both proved unreliable
+-- across these Studio-imported portal arches (this one, MainIslandPortal, ended up with its prompt
+-- sitting 98% of the way up a 21-stud-tall arch).
+local PORTAL_INTERACTION_HEIGHT = 5
+
 local function getPortalInteractionAnchor(model)
-	local interactionAnchor = model:FindFirstChild("InteractionAnchor")
-	if not interactionAnchor then
-		interactionAnchor = model:WaitForChild("InteractionAnchor", 10)
+	local ok, cframe, size = pcall(function()
+		return model:GetBoundingBox()
+	end)
+	if not ok then
+		return getModelPromptPart(model)
 	end
-	if interactionAnchor and interactionAnchor:IsA("BasePart") then
-		return interactionAnchor
+	local targetPosition = Vector3.new(cframe.Position.X, cframe.Position.Y - size.Y / 2 + PORTAL_INTERACTION_HEIGHT, cframe.Position.Z)
+
+	local anchor = model:FindFirstChild("InteractionAnchor")
+	if anchor and anchor:IsA("BasePart") then
+		anchor.Anchored = true
+		anchor.Position = targetPosition
+		return anchor
 	end
-	return getModelPromptPart(model)
+
+	anchor = Instance.new("Part")
+	anchor.Name = "InteractionAnchor"
+	anchor.Size = Vector3.new(4, 4, 4)
+	anchor.Transparency = 1
+	anchor.CanCollide = false
+	anchor.CanTouch = false
+	anchor.CanQuery = true
+	anchor.Anchored = true
+	anchor.Position = targetPosition
+	anchor.Parent = model
+	return anchor
 end
 
 local function configureIslandSpawn(spawn)

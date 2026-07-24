@@ -21,37 +21,41 @@ local HUB_PORTAL_MARGIN = 40
 local teleportCooldown = {}
 local connectedPortals = {}
 
+-- Studs above the portal model's own base to place the interaction prompt - roughly chest/eye
+-- height for a standing player, not "wherever a manually-placed InteractionAnchor or the model's
+-- biggest/first part happens to sit". Portal models are Studio-imported arches of wildly varying
+-- height (17 to 136 studs tall across the current set) and their PrimaryPart is whatever the
+-- import happened to set it to (often a structural node partway up the arch, not a walk-through
+-- point) - trusting that put the prompt anywhere from 7% to 98% up the model on different islands.
+local PORTAL_INTERACTION_HEIGHT = 5
+
 local function getPortalPromptPart(portalModel)
-	local interactionAnchor = portalModel:FindFirstChild("InteractionAnchor")
-	if not interactionAnchor then
-		interactionAnchor = portalModel:WaitForChild("InteractionAnchor", 10)
+	local ok, cframe, size = pcall(function()
+		return portalModel:GetBoundingBox()
+	end)
+	if not ok then
+		return nil
 	end
-	if interactionAnchor and interactionAnchor:IsA("BasePart") then
-		return interactionAnchor
+	local targetPosition = Vector3.new(cframe.Position.X, cframe.Position.Y - size.Y / 2 + PORTAL_INTERACTION_HEIGHT, cframe.Position.Z)
+
+	local anchor = portalModel:FindFirstChild("InteractionAnchor")
+	if anchor and anchor:IsA("BasePart") then
+		anchor.Anchored = true
+		anchor.Position = targetPosition
+		return anchor
 	end
 
-	if portalModel.PrimaryPart and portalModel.PrimaryPart:IsA("BasePart") then
-		return portalModel.PrimaryPart
-	end
-
-	local largestPart = nil
-	local largestVolume = -math.huge
-	for _, descendant in portalModel:GetDescendants() do
-		if descendant:IsA("BasePart") then
-			descendant.Anchored = true
-			descendant.CanCollide = false
-			local volume = descendant.Size.X * descendant.Size.Y * descendant.Size.Z
-			if volume > largestVolume then
-				largestVolume = volume
-				largestPart = descendant
-			end
-		end
-	end
-
-	if largestPart then
-		portalModel.PrimaryPart = largestPart
-	end
-	return largestPart
+	anchor = Instance.new("Part")
+	anchor.Name = "InteractionAnchor"
+	anchor.Size = Vector3.new(4, 4, 4)
+	anchor.Transparency = 1
+	anchor.CanCollide = false
+	anchor.CanTouch = false
+	anchor.CanQuery = true
+	anchor.Anchored = true
+	anchor.Position = targetPosition
+	anchor.Parent = portalModel
+	return anchor
 end
 
 local function waitForPortalRouting()
