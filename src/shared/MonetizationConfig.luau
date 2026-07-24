@@ -10,7 +10,7 @@ MonetizationConfig.GamePasses = {
 	},
 	{
 		Key = "AutoHatch",
-		Id = 0, -- placeholder - create the GamePass on the Roblox creator dashboard and fill in its real Id before publishing
+		Id = 1928874679,
 		Name = "Auto-Hatch Pass",
 		Description = "Eggs repurchase and hatch on their own - no more standing at the shop.",
 		AttributeName = "OwnsAutoHatch",
