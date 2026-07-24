@@ -41,6 +41,9 @@ local EquipBestDragons = Events:WaitForChild("EquipBestDragons")
 local SetDragonFavorite = Events:WaitForChild("SetDragonFavorite")
 local SetDragonLocked = Events:WaitForChild("SetDragonLocked")
 local DragonStorageFull = Events:WaitForChild("DragonStorageFull")
+local BulkHatchEggs = Events:WaitForChild("BulkHatchEggs")
+local BulkEggHatched = Events:WaitForChild("BulkEggHatched")
+local SetAutoHatch = Events:WaitForChild("SetAutoHatch")
 local TutorialEvents = ReplicatedStorage:WaitForChild("TutorialEvents")
 local TutorialProgressSignal = TutorialEvents:WaitForChild("TutorialProgressSignal")
 local GrantTutorialRewardEgg = TutorialEvents:WaitForChild("GrantTutorialRewardEgg")
@@ -88,6 +91,13 @@ end
 local playerData = {}
 local nextDragonId = 0
 local pendingHatches = {}
+-- Auto-Hatch Pass state: { eggType = string, enabled = boolean } per player. Kept separate from
+-- playerData since it's a session preference, not save data - it resets to off on rejoin like any
+-- other UI toggle, and re-enabling is one click away for Pass owners.
+local autoHatchState = {}
+-- Forward-declared (assigned after getEggSpawnPosition/createEgg exist, further down the file) so
+-- finalizeHatch - defined earlier - can call it; same pattern as autoAssignIdleDragons below.
+local tryStartAutoHatch
 local autoAssignIdleDragons
 
 local function getPlayerData(player)
@@ -1261,7 +1271,7 @@ local function watchDragonNestSlots(player)
 	end)
 end
 
-local function rollHatchResults(eggRecord)
+local function rollHatchResults(player, eggRecord)
 	local eggType = eggRecord.eggType or "Common"
 	local rolledDragonType = DragonEggConfig.RollDragonType(eggType)
 	if not rolledDragonType then
@@ -1335,7 +1345,142 @@ local function finalizeHatch(player, eggRecord, rollResults)
 	EggHatched:FireClient(player, rollResults.rarity, rollResults.rolledDragonType, nil, eggType, ownedRecord.id)
 	sendUIUpdate(player)
 	sendDragonMergeUpdate(player, "Hatched " .. DragonEggConfig.GetDragonDisplayName(rollResults.rolledDragonType) .. " into storage")
+	if tryStartAutoHatch then
+		tryStartAutoHatch(player)
+	end
 end
+
+-- "Open x10" (or any batch size up to this) - rolls straight to storage, skipping the physical
+-- egg model + 6s wait + one-at-a-time cinematic that the single-purchase flow uses. Building 10
+-- simultaneous world eggs with staggered hatch timers would need a whole reveal queue on the
+-- client; a batch is a fundamentally different (much faster) flow, so it gets its own results
+-- payload (BulkEggHatched) instead of overloading EggHatchStart/EggHatched.
+local MAX_BULK_HATCH_QUANTITY = 10
+
+local function bulkHatchEggs(player, eggType, quantity)
+	eggType = DragonEggConfig.IsValidEggType(eggType) and eggType or "Common"
+	quantity = math.clamp(math.floor(tonumber(quantity) or 1), 1, MAX_BULK_HATCH_QUANTITY)
+	local eggInfo = DragonEggConfig.GetEggTypeInfo(eggType)
+	local data = getPlayerData(player)
+
+	if eggInfo.RewardOnly then
+		sendEggShopUpdate(player, eggInfo.DisplayName .. " is earned from rewards")
+		return
+	end
+	if eggInfo.Reserved or not eggInfo.Dragons or #eggInfo.Dragons == 0 then
+		sendEggShopUpdate(player, eggInfo.DisplayName .. " is reserved for future dragons")
+		return
+	end
+	if eggInfo.IsFeatured and not DragonEggConfig.IsFeaturedEggActive() then
+		sendEggShopUpdate(player, eggInfo.DisplayName .. " is not available right now - check back soon")
+		return
+	end
+	if eggInfo.RequiresIsland then
+		local unlockChecker = BiomeResourceRegistry.IsIslandUnlockedForPlayer
+		if typeof(unlockChecker) == "function" and not unlockChecker(player, eggInfo.RequiresIsland) then
+			local island = IslandUnlockConfig.GetIslandById(eggInfo.RequiresIsland)
+			sendEggShopUpdate(player, "Unlock " .. (island and island.DisplayName or eggInfo.RequiresIsland) .. " first")
+			return
+		end
+	end
+
+	local isGemEgg = eggInfo.GemCost ~= nil
+	local unitCost = isGemEgg and eggInfo.GemCost or eggInfo.Cost
+	local fullCost = unitCost * quantity
+	local funds = isGemEgg and (player:GetAttribute("PremiumGems") or 0) or data.essence
+	if funds < unitCost then
+		sendEggShopUpdate(player, "Need " .. tostring(unitCost) .. (isGemEgg and " Gems" or " Dragon Essence"))
+		return
+	end
+
+	local storageRemaining = DragonInventoryService.GetStorageCapacity(player) - DragonInventoryService.GetOwnedCount(data)
+	if storageRemaining <= 0 then
+		DragonStorageFull:FireClient(player, {
+			storageCount = DragonInventoryService.GetOwnedCount(data),
+			storageMax = DragonInventoryService.GetStorageCapacity(player),
+		})
+		sendEggShopUpdate(player, "Dragon Storage is full")
+		return
+	end
+
+	-- Buy as many as funds and storage actually allow rather than refusing the whole batch - matches
+	-- how buying one at a time would naturally stop once either runs out.
+	local affordableQuantity = math.floor(funds / unitCost)
+	local actualQuantity = math.min(quantity, affordableQuantity, storageRemaining)
+	if actualQuantity <= 0 then
+		sendEggShopUpdate(player, "Need " .. tostring(fullCost) .. (isGemEgg and " Gems" or " Dragon Essence"))
+		return
+	end
+	local actualCost = unitCost * actualQuantity
+
+	if isGemEgg then
+		player:SetAttribute("PremiumGems", (player:GetAttribute("PremiumGems") or 0) - actualCost)
+	else
+		data.essence -= actualCost
+	end
+
+	local stats = sanitizeEggStats(data.eggStats)
+	local results = {}
+	for _ = 1, actualQuantity do
+		local rolledDragonType = DragonEggConfig.RollDragonType(eggType)
+		if not rolledDragonType then
+			break
+		end
+		local rarity = eggInfo.GuaranteedRarity or AscensionBonusService.RollHatchRarity(player)
+		local dragonModelName = DragonEggConfig.GetDragonModelName(rolledDragonType)
+		local ownedRecord = DragonInventoryService.AddOwnedDragon(data, {
+			dragonType = dragonModelName,
+			rarity = rarity,
+			level = 1,
+			evolutionLevel = 0,
+		})
+		stats.Purchases[eggType] = (stats.Purchases[eggType] or 0) + 1
+		stats.TotalPurchases += 1
+		stats.Hatched[eggType] = (stats.Hatched[eggType] or 0) + 1
+		stats.TotalHatched += 1
+		table.insert(results, {
+			id = ownedRecord.id,
+			dragonType = dragonModelName,
+			rarity = rarity,
+			displayName = DragonEggConfig.GetDragonDisplayName(dragonModelName),
+			icon = DragonEggConfig.GetSpeciesIcon(dragonModelName),
+		})
+		AchievementProgressSignal:Fire(player, "OpenEgg", 1, { eggType = eggType })
+		AchievementProgressSignal:Fire(player, "HatchDragon", 1, {
+			eggType = eggType,
+			rarity = rarity,
+			dragonType = rolledDragonType,
+			dragonModelName = dragonModelName,
+		})
+	end
+	data.eggStats = stats
+
+	if #results > 0 then
+		TutorialProgressSignal:Fire(player, "BuyFirstEgg")
+		TutorialProgressSignal:Fire(player, "HatchFirstDragon")
+	end
+
+	saveDragonLevels(player)
+	saveEggProgress(player)
+	sendUIUpdate(player)
+	sendDragonMergeUpdate(player, "Hatched " .. #results .. " " .. eggInfo.DisplayName .. "(s)")
+	BulkEggHatched:FireClient(player, {
+		eggType = eggType,
+		eggDisplayName = eggInfo.DisplayName,
+		requested = quantity,
+		granted = #results,
+		totalCost = actualCost,
+		isGemEgg = isGemEgg,
+		results = results,
+	})
+end
+
+BulkHatchEggs.OnServerEvent:Connect(function(player, eggType, quantity)
+	if not RateLimiter.check(player, "BulkHatchEggs", 0.5) then
+		return
+	end
+	bulkHatchEggs(player, eggType, quantity)
+end)
 
 local function beginHatchSequence(player, eggRecord)
 	if not player.Parent or not eggRecord.model or not eggRecord.model.Parent then
@@ -1343,7 +1488,7 @@ local function beginHatchSequence(player, eggRecord)
 		return
 	end
 
-	local rollResults = rollHatchResults(eggRecord)
+	local rollResults = rollHatchResults(player, eggRecord)
 	if not rollResults then
 		removeEggRecord(getPlayerData(player), eggRecord)
 		if eggRecord.model and eggRecord.model.Parent then
@@ -2178,6 +2323,57 @@ local function getEggSpawnPosition(player)
 	return nil
 end
 
+-- Auto-Hatch Pass: if the player has it toggled on and actually owns the GamePass, and isn't
+-- already sitting on a pending egg, buy one more of their chosen type. createEgg's own gates
+-- (essence/gems, storage capacity, island requirement) silently no-op the attempt when any of
+-- those fail - that's fine here, since the periodic sweep below will just try again once the
+-- player has more funds/space, without the toggle ever needing to be flipped again.
+tryStartAutoHatch = function(player)
+	local state = autoHatchState[player]
+	if not state or not state.enabled then
+		return
+	end
+	if not player:GetAttribute("OwnsAutoHatch") then
+		return
+	end
+	local data = getPlayerData(player)
+	if #data.eggs > 0 then
+		return
+	end
+	local position = getEggSpawnPosition(player)
+	if not position then
+		return
+	end
+	createEgg(player, position, state.eggType)
+end
+
+SetAutoHatch.OnServerEvent:Connect(function(player, eggType, enabled)
+	if not player:GetAttribute("OwnsAutoHatch") then
+		sendEggShopUpdate(player, "Auto-Hatch requires the Auto-Hatch Pass")
+		return
+	end
+	eggType = DragonEggConfig.IsValidEggType(eggType) and eggType or "Common"
+	autoHatchState[player] = { eggType = eggType, enabled = enabled == true }
+	if enabled then
+		tryStartAutoHatch(player)
+	end
+end)
+
+-- Safety net: without this, a player who runs out of essence/storage mid-auto-hatch would stay
+-- stuck forever (finalizeHatch only re-triggers the chain right after a hatch, so nothing else
+-- would ever retry). Sweeping every few seconds means the chain quietly resumes on its own once
+-- they've collected more essence or freed up storage, matching the "hands-off" promise of the pass.
+task.spawn(function()
+	while true do
+		task.wait(5)
+		for player, state in autoHatchState do
+			if state.enabled and player.Parent then
+				tryStartAutoHatch(player)
+			end
+		end
+	end
+end)
+
 BuyDragonEgg.OnServerEvent:Connect(function(player, eggType)
 	if not RateLimiter.check(player, "BuyDragonEgg", 0.3) then
 		return
@@ -2404,6 +2600,7 @@ Players.PlayerRemoving:Connect(function(player)
 	end
 
 	playerData[player] = nil
+	autoHatchState[player] = nil
 	DragonAbilityService.Release(player)
 end)
 

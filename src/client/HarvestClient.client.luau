@@ -4,9 +4,11 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local Theme = require(ReplicatedStorage:WaitForChild("DragonUITheme"))
 local UIBridge = require(ReplicatedStorage:WaitForChild("UIBridge"))
+local MonetizationConfig = require(ReplicatedStorage:WaitForChild("MonetizationConfig"))
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 local camera = workspace.CurrentCamera
@@ -26,6 +28,9 @@ local EggShopUpdate = Events:WaitForChild("EggShopUpdate")
 local RequestDragonMergeData = Events:WaitForChild("RequestDragonMergeData")
 local MergeDragons = Events:WaitForChild("MergeDragons")
 local DragonMergeUpdate = Events:WaitForChild("DragonMergeUpdate")
+local BulkHatchEggs = Events:WaitForChild("BulkHatchEggs")
+local BulkEggHatched = Events:WaitForChild("BulkEggHatched")
+local SetAutoHatch = Events:WaitForChild("SetAutoHatch")
 
 local IslandEvents = ReplicatedStorage:WaitForChild("IslandEvents")
 local IslandUnlockState = IslandEvents:WaitForChild("IslandUnlockState")
@@ -69,6 +74,20 @@ local eggShopState = {
 	ownedEggs = {},
 	eggStats = {},
 }
+local eggShopBulkButton = nil
+local eggShopAutoButton = nil
+local autoHatchEnabled = false
+local AUTO_HATCH_PASS = nil
+for _, pass in MonetizationConfig.GamePasses do
+	if pass.Key == "AutoHatch" then
+		AUTO_HATCH_PASS = pass
+		break
+	end
+end
+local bulkResultsGui = nil
+local bulkResultsPanel = nil
+local bulkResultsList = nil
+local bulkResultsSummary = nil
 local mergeGui = nil
 local mergePanel = nil
 local mergeList = nil
@@ -1027,7 +1046,7 @@ local function createEggShopUI()
 	-- actual position so there's no overlap; see PurchaseButton below (anchored 58px from panel bottom).
 	eggShopPreviewInfoScroll = Instance.new("ScrollingFrame")
 	eggShopPreviewInfoScroll.Name = "PreviewInfoScroll"
-	eggShopPreviewInfoScroll.Size = UDim2.new(1, 0, 0, 100)
+	eggShopPreviewInfoScroll.Size = UDim2.new(1, 0, 0, 64)
 	eggShopPreviewInfoScroll.Position = UDim2.fromOffset(0, 166)
 	eggShopPreviewInfoScroll.BackgroundTransparency = 1
 	eggShopPreviewInfoScroll.BorderSizePixel = 0
@@ -1069,6 +1088,62 @@ local function createEggShopUI()
 		end,
 	})
 	applyPurchaseButtonGradient(eggShopPurchaseButton, true)
+
+	local bulkAutoRow = Theme.createFrame({
+		Name = "BulkAutoRow", Parent = eggShopDetailPanel,
+		Size = UDim2.new(1, 0, 0, 36), Position = UDim2.fromOffset(0, 234),
+		BgTransparency = 1, ZIndex = 12,
+	})
+	local bulkAutoLayout = Instance.new("UIListLayout")
+	bulkAutoLayout.FillDirection = Enum.FillDirection.Horizontal
+	bulkAutoLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	bulkAutoLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	bulkAutoLayout.Padding = UDim.new(0, 8)
+	bulkAutoLayout.Parent = bulkAutoRow
+
+	eggShopBulkButton = Theme.createButton({
+		Name = "BulkButton", Parent = bulkAutoRow, Text = "Open x10",
+		Size = UDim2.fromOffset(150, 34), Bg = Theme.Colors.Crystal, TextSize = 13, ZIndex = 13,
+		OnClick = function()
+			if not selectedEggType then
+				return
+			end
+			local eggInfo = DragonEggConfig.GetEggTypeInfo(selectedEggType)
+			if eggInfo.Reserved then
+				setEggShopStatus(eggInfo.DisplayName .. " is reserved for future dragons.")
+				return
+			end
+			if eggInfo.IsFeatured and not DragonEggConfig.IsFeaturedEggActive() then
+				setEggShopStatus(eggInfo.DisplayName .. " returns in " .. formatFeaturedCountdown(DragonEggConfig.GetFeaturedEggCountdown()) .. ".")
+				return
+			end
+			setEggShopStatus("Opening 10 " .. eggInfo.DisplayName .. "s...")
+			BulkHatchEggs:FireServer(selectedEggType, 10)
+		end,
+	})
+
+	eggShopAutoButton = Theme.createButton({
+		Name = "AutoHatchButton", Parent = bulkAutoRow, Text = "Auto-Hatch: OFF",
+		Size = UDim2.fromOffset(150, 34), Bg = Theme.Colors.NavyEdge, TextSize = 13, ZIndex = 13,
+		OnClick = function()
+			if not player:GetAttribute("OwnsAutoHatch") then
+				if AUTO_HATCH_PASS and AUTO_HATCH_PASS.Id > 0 then
+					MarketplaceService:PromptGamePassPurchase(player, AUTO_HATCH_PASS.Id)
+				else
+					setEggShopStatus("Auto-Hatch Pass coming soon.")
+				end
+				return
+			end
+			if not selectedEggType then
+				setEggShopStatus("Select an egg to auto-hatch first.")
+				return
+			end
+			autoHatchEnabled = not autoHatchEnabled
+			SetAutoHatch:FireServer(selectedEggType, autoHatchEnabled)
+			eggShopAutoButton.Text = autoHatchEnabled and "Auto-Hatch: ON" or "Auto-Hatch: OFF"
+			eggShopAutoButton.BackgroundColor3 = autoHatchEnabled and Theme.Colors.Success or Theme.Colors.NavyEdge
+		end,
+	})
 
 	local priceRow = Theme.createFrame({
 		Name = "PurchasePriceRow", Parent = eggShopDetailPanel,
@@ -1522,6 +1597,114 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt)
 	elseif prompt.Name == "DragonMergePrompt" then
 		openMergeUI("Dragon Academy merge chamber ready.")
 	end
+end)
+
+local function closeBulkResultsUI()
+	if not bulkResultsGui or not bulkResultsPanel then
+		return
+	end
+	local dim = bulkResultsGui:FindFirstChild("DimBackground")
+	Theme.closeModalWindow(bulkResultsGui, bulkResultsPanel, dim, function()
+		if _G.DragonIslandNotifyModalClosed then
+			_G.DragonIslandNotifyModalClosed(bulkResultsGui.Name)
+		end
+	end)
+end
+
+local function createBulkResultsUI()
+	if bulkResultsGui then
+		return
+	end
+	local playerGui = player:WaitForChild("PlayerGui")
+	bulkResultsGui = Instance.new("ScreenGui")
+	bulkResultsGui.Name = "BulkHatchResultsUI"
+	bulkResultsGui.ResetOnSpawn = false
+	bulkResultsGui.IgnoreGuiInset = true
+	bulkResultsGui.DisplayOrder = 40
+	bulkResultsGui.Enabled = false
+	bulkResultsGui.Parent = playerGui
+
+	local dim = Theme.createDim(bulkResultsGui, 1)
+	dim.Name = "DimBackground"
+	dim.Visible = false
+
+	bulkResultsPanel = Theme.createPanel({
+		Name = "BulkResultsPanel", Parent = bulkResultsGui,
+		Size = UDim2.fromOffset(480, 480), Visible = false,
+	})
+	Theme.createCloseButton(bulkResultsPanel, function()
+		closeBulkResultsUI()
+	end, 30)
+	Theme.createWindowHeader(bulkResultsPanel, "Hatch Results", "Here's what you got", 8)
+
+	bulkResultsSummary = Theme.createText({
+		Name = "Summary", Parent = bulkResultsPanel, Text = "",
+		Size = UDim2.new(1, -32, 0, 24), Position = UDim2.fromOffset(16, 62),
+		TextSize = 14, Font = Theme.Fonts.Bold, Color = Theme.Colors.TextGold,
+		XAlign = Enum.TextXAlignment.Center, ZIndex = 9,
+	})
+
+	bulkResultsList = Theme.createScrollList(
+		bulkResultsPanel,
+		UDim2.fromOffset(448, 350),
+		UDim2.fromOffset(16, 96),
+		7
+	)
+
+	dim.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			closeBulkResultsUI()
+		end
+	end)
+end
+
+local function openBulkResultsUI(payload)
+	createBulkResultsUI()
+	bulkResultsGui.Enabled = true
+	local dim = bulkResultsGui:FindFirstChild("DimBackground")
+	local opening = bulkResultsPanel and not bulkResultsPanel.Visible
+	if opening then
+		Theme.raiseModalGui(bulkResultsGui)
+		if _G.DragonIslandNotifyModalOpened then
+			_G.DragonIslandNotifyModalOpened(bulkResultsGui.Name)
+		end
+	end
+	Theme.tweenOpen(bulkResultsPanel, dim)
+
+	local currency = payload.isGemEgg and "Gems" or "Dragon Essence"
+	bulkResultsSummary.Text = string.format(
+		"%s x%d - spent %s %s",
+		payload.eggDisplayName or "Eggs",
+		payload.granted or 0,
+		formatNumber(payload.totalCost or 0),
+		currency
+	)
+	if (payload.granted or 0) < (payload.requested or 0) then
+		bulkResultsSummary.Text ..= string.format(" (%d requested)", payload.requested or 0)
+	end
+
+	for _, child in bulkResultsList:GetChildren() do
+		if string.sub(child.Name, 1, 10) == "ResultRow_" then
+			child:Destroy()
+		end
+	end
+	for index, result in payload.results or {} do
+		local rarityInfo = DragonEggConfig.GetRarityInfo(result.rarity)
+		Theme.createListRow(bulkResultsList, {
+			Name = "ResultRow_" .. tostring(index),
+			Text = (result.displayName or result.dragonType or "Dragon") .. "   -   " .. (result.rarity or "Common"),
+			Height = 46,
+			LayoutOrder = index,
+			StrokeColor = rarityInfo and rarityInfo.Color or nil,
+		})
+	end
+end
+
+BulkEggHatched.OnClientEvent:Connect(function(payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+	openBulkResultsUI(payload)
 end)
 
 EggShopUpdate.OnClientEvent:Connect(function(payload)
