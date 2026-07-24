@@ -1174,6 +1174,16 @@ local function getMergeSelectionPreview()
 			return first, "Selected dragons must match type, rarity, and evolution."
 		end
 	end
+	-- The server only merges dragons that are actively equipped (it needs a live world model to
+	-- work with) and silently rejects anything else with "One selected dragon is unavailable" - a
+	-- message easy to miss. Without this check the preview would say "Ready to merge" and light up
+	-- the button green for 3 matching storage dragons, and clicking it would just do nothing,
+	-- looking exactly like a broken button.
+	for _, dragon in selected do
+		if not dragon.isEquipped then
+			return first, "All 3 dragons must be active (not in storage) to merge - equip them first."
+		end
+	end
 	if first.evolutionLevel >= (mergeState.maxEvolutionLevel or 5) then
 		return first, "This dragon is already max evolution."
 	end
@@ -1197,7 +1207,12 @@ local function formatMergeStats(stats)
 	}, "\n")
 end
 
-local function updateMergeUI()
+-- Cheap: slot text, existing row highlights, preview/stats/cost/status, and the merge button
+-- state. Deliberately does NOT touch the dragon list rows - call updateMergeUI() instead when
+-- mergeState.dragons itself changes (new/removed/changed dragon from a server payload). Selecting
+-- or deselecting a dragon, or essence changing from background harvesting, doesn't change which
+-- dragons exist, so it never needs to touch the rows themselves.
+local function updateMergeSelectionUI()
 	if not mergePanel then
 		return
 	end
@@ -1206,33 +1221,8 @@ local function updateMergeUI()
 		slot.Text = dragon and ((dragon.displayName or dragon.dragonType) .. "\n" .. (dragon.rarity or "Common") .. " " .. (dragon.stars or "")) or ("Slot " .. tostring(index))
 	end
 
-	if mergeList then
-		for _, child in mergeList:GetChildren() do
-			if child:IsA("TextButton") then
-				child:Destroy()
-			end
-		end
-		mergeListRows = {}
-		for index, dragon in mergeState.dragons do
-			local row = Theme.createListRow(mergeList, {
-				Name = "DragonRow_" .. tostring(dragon.id),
-				Text = (dragon.displayName or dragon.dragonType) .. "  " .. (dragon.rarity or "Common") .. " " .. (dragon.stars or "") .. "\nLv. " .. tostring(dragon.level or 1) .. "  Matching: " .. tostring(dragon.matchingCount or 0) .. (dragon.mergeAvailable and "  Can Merge" or ""),
-				Height = 58,
-				Bg = dragon.mergeAvailable and Theme.Colors.NavyEdge or Theme.Colors.NavyDeep,
-				LayoutOrder = index,
-				OnClick = function()
-					local selectedIndex = table.find(selectedMergeIds, dragon.id)
-					if selectedIndex then
-						table.remove(selectedMergeIds, selectedIndex)
-					elseif #selectedMergeIds < 3 then
-						table.insert(selectedMergeIds, dragon.id)
-					end
-					updateMergeUI()
-				end,
-			})
-			Theme.setListRowSelected(row, isMergeSelected(dragon.id), Theme.Colors.Crystal)
-			mergeListRows[dragon.id] = row
-		end
+	for dragonId, row in mergeListRows do
+		Theme.setListRowSelected(row, isMergeSelected(dragonId), Theme.Colors.Crystal)
 	end
 
 	local previewDragon, message = getMergeSelectionPreview()
@@ -1257,6 +1247,49 @@ local function updateMergeUI()
 		mergeStroke.Color = canMerge and Theme.Colors.GoldBright or Theme.Colors.Gold
 		mergeStroke.Transparency = canMerge and 0.2 or 0.5
 	end
+end
+
+-- Full rebuild: destroys and recreates every row in the dragon list, so it's only for when
+-- mergeState.dragons itself changed. This used to also run on every single row click AND on every
+-- HarvestUIUpdate tick (i.e. continuously while dragons harvest in the background) - destroying and
+-- recreating potentially hundreds of rows several times a second, which is exactly what looked like
+-- the merge list "flickering" and made clicking a specific dragon unreliable (a click landing mid-
+-- rebuild can miss the row entirely, or the list can rescroll out from under the player's cursor).
+local function updateMergeUI()
+	if not mergePanel then
+		return
+	end
+
+	if mergeList then
+		for _, child in mergeList:GetChildren() do
+			if child:IsA("TextButton") then
+				child:Destroy()
+			end
+		end
+		mergeListRows = {}
+		for index, dragon in mergeState.dragons do
+			local row = Theme.createListRow(mergeList, {
+				Name = "DragonRow_" .. tostring(dragon.id),
+				Text = (dragon.displayName or dragon.dragonType) .. "  " .. (dragon.rarity or "Common") .. " " .. (dragon.stars or "") .. "\nLv. " .. tostring(dragon.level or 1) .. "  Matching: " .. tostring(dragon.matchingCount or 0) .. (dragon.mergeAvailable and "  Can Merge" or ""),
+				Height = 58,
+				Bg = dragon.mergeAvailable and Theme.Colors.NavyEdge or Theme.Colors.NavyDeep,
+				LayoutOrder = index,
+				OnClick = function()
+					local selectedIndex = table.find(selectedMergeIds, dragon.id)
+					if selectedIndex then
+						table.remove(selectedMergeIds, selectedIndex)
+					elseif #selectedMergeIds < 3 then
+						table.insert(selectedMergeIds, dragon.id)
+					end
+					updateMergeSelectionUI()
+				end,
+			})
+			Theme.setListRowSelected(row, isMergeSelected(dragon.id), Theme.Colors.Crystal)
+			mergeListRows[dragon.id] = row
+		end
+	end
+
+	updateMergeSelectionUI()
 end
 
 local function applyMergePayload(payload)
@@ -1337,7 +1370,7 @@ local function createMergeUI()
 		Theme.attachHover(slot, Theme.Colors.NavyEdge)
 		slot.Activated:Connect(function()
 			table.remove(selectedMergeIds, index)
-			updateMergeUI()
+			updateMergeSelectionUI()
 		end)
 		mergeSlots[index] = slot
 	end
@@ -1393,7 +1426,7 @@ local function createMergeUI()
 	end)
 	mergeCancelButton.Activated:Connect(function()
 		selectedMergeIds = {}
-		updateMergeUI()
+		updateMergeSelectionUI()
 	end)
 	mergeButton.Activated:Connect(function()
 		if mergeButton.Active then
@@ -1905,7 +1938,7 @@ HarvestUIUpdate.OnClientEvent:Connect(function(essence)
 	mergeState.essence = currentEssence
 	updateUpgradeUI()
 	updateEggShopUI()
-	updateMergeUI()
+	updateMergeSelectionUI()
 end)
 
 player:GetAttributeChangedSignal("DragonEssence"):Connect(function()
